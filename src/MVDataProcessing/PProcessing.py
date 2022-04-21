@@ -10,6 +10,23 @@ import datetime as dt
 import numpy as np
 from datetime import datetime
 
+def DummyData(start_date=dt.datetime(2020,1,1), end_date=dt.datetime(2022,1,1),remove_data= 0.30):
+        
+    dummy = np.arange(start_date, end_date,np.timedelta64(5,'m'), dtype='datetime64')
+    dummy = dummy + np.timedelta64(39,'s') # ADD a second to the end so during the sort this samples will be at last (HH:MM:01)   
+        
+    dummy = pd.DataFrame(dummy,columns=['timestamp'])
+    
+    dummy['VA'] = dummy['timestamp'].dt.day
+    dummy['VB'] = dummy['timestamp'].dt.hour
+    dummy['VV'] = dummy['timestamp'].dt.minute
+    dummy['VN'] = dummy['timestamp'].dt.second
+    
+      
+    for col in ['VA','VB','VV']:
+        dummy.loc[dummy.sample(frac=remove_data).index, col] = np.nan
+
+    return dummy
 
 def DataClean(awnser,start_date_dt,end_date_dt,sample_freq = 5):    
     

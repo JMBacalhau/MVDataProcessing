@@ -1,5 +1,7 @@
 # MVDataProcessing
-Missing Data Imputation Method for Medium Voltage Distribution Network Feeders
+##Missing Data Imputation Method for Medium Voltage Distribution Network Feeders
+
+### Abstract
 
 The energy sector’s investment aims to ensure a continuous, reliable, and quality
 supply of electrical energy imposed by the electricity regulatory agency with maximum
@@ -15,3 +17,16 @@ phases, interpolation, and the normalized scaled standard weekday curve.
 Article published on [Link](https://www.sba.org.br/open_journal_systems/index.php/cba/article/view/968).
 
 
+### Structure
+```
+packaging_tutorial/
+├── LICENSE
+├── pyproject.toml
+├── README.md
+├── setup.cfg
+├── src/
+│   └── example_package/
+│       ├── __init__.py
+│       └── example.py
+└── tests/
+```

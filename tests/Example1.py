@@ -22,7 +22,7 @@ if __name__ == "__main__":
     start_date = dt.datetime(2020,1,1)
     end_date = dt.datetime(2022,1,1)
     
-    dummy = PProcessing.DummyData(start_date,end_date,remove_data=0)
+    dummy = PProcessing.DummyData(start_date,end_date,remove_data=0.20,freq_min=7,delta_sec=39)
     
     time_init = time.perf_counter()        
 

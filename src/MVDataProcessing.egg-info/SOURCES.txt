@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+src/MVDataProcessing/PProcessing.py
+src/MVDataProcessing/__init__.py
+src/MVDataProcessing.egg-info/PKG-INFO
+src/MVDataProcessing.egg-info/SOURCES.txt
+src/MVDataProcessing.egg-info/dependency_links.txt
+src/MVDataProcessing.egg-info/top_level.txt

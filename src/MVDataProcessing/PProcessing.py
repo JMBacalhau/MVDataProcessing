@@ -10,10 +10,10 @@ import datetime as dt
 import numpy as np
 from datetime import datetime
 
-def DummyData(start_date=dt.datetime(2020,1,1), end_date=dt.datetime(2022,1,1),remove_data= 0.30):
+def DummyData(start_date=dt.datetime(2020,1,1), end_date=dt.datetime(2022,1,1),remove_data= 0.30,freq_min=5,delta_sec=39):
         
-    dummy = np.arange(start_date, end_date,np.timedelta64(5,'m'), dtype='datetime64')
-    dummy = dummy + np.timedelta64(39,'s') # ADD a second to the end so during the sort this samples will be at last (HH:MM:01)   
+    dummy = np.arange(start_date, end_date,np.timedelta64(freq_min,'m'), dtype='datetime64')
+    dummy = dummy + np.timedelta64(delta_sec,'s') # ADD a second to the end so during the sort this samples will be at last (HH:MM:01)   
         
     dummy = pd.DataFrame(dummy,columns=['timestamp'])
     

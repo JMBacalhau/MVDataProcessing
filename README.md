@@ -12,5 +12,6 @@ Therefore, this library proposes a method of
 preprocessing, and missing data imputation using the unbalanced characteristic between
 phases, interpolation, and the normalized scaled standard weekday curve. 
 
+Article published on [Link](https://www.sba.org.br/open_journal_systems/index.php/cba/article/view/968).
 
 

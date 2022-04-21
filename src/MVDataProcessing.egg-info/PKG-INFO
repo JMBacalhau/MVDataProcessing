@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: MVDataProcessing
-Version: 0.0.2
+Version: 0.0.4
 Summary: Missing Data Imputation Method for Medium Voltage Distribution Network Feeders
 Home-page: https://github.com/JMBacalhau/MVDataProcessing
 Author: João Bacalhau

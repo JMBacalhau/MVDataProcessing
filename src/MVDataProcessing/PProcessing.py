@@ -10,6 +10,25 @@ import datetime as dt
 import numpy as np
 from datetime import datetime
 
+
+def IntegrateHour(Y,sample_freq = 5):
+    
+    time_vet_stamp = Y.iloc[np.arange(0,len(Y.iloc[:,0]),int(60/sample_freq)),0]
+    time_vet_stamp = time_vet_stamp.reset_index(drop=True)
+    Y = Y.groupby([Y.datahora.dt.year,Y.datahora.dt.month,Y.datahora.dt.day,Y.datahora.dt.hour,Y.datahora.dt.hour]).mean() 
+    Y = Y.reset_index(drop=True)
+    Y.insert(0,'datahora', time_vet_stamp)
+    
+    return Y
+
+
+def Correlation(Y):
+    
+    corr_value = Y.corr()[Y.corr()!=1].mean().mean()
+    
+    return corr_value
+    
+
 def DummyData(start_date=dt.datetime(2020,1,1), end_date=dt.datetime(2022,1,1),remove_data= 0.30,freq_min=5,delta_sec=39):
         
     dummy = np.arange(start_date, end_date,np.timedelta64(freq_min,'m'), dtype='datetime64')

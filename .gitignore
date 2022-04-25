@@ -11,6 +11,8 @@ __pycache__/
 # C extensions
 *.so
 
+#MYFILES
+*.csv
 
 # Distribution / packaging
 .Python

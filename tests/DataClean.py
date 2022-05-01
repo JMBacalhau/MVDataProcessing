@@ -323,14 +323,7 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
         
     return Y
     
-def RemovePeriod(x_in,df_remove):
-    
-    Y = x_in.copy(deep=True)
-    
-    for index,row in df_remove.iterrows():
-        Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),:] = np.nan
-        
-    return Y
+
     
 def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
         
@@ -358,15 +351,72 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     
     return Y
 
-
-def RemoveOutliersHistoGram(x_in,hard_max=False,hard_min=False,df_avoid_periods = False):
+def RemovePeriod(x_in,df_remove):
     
-    return 0 
+    Y = x_in.copy(deep=True)    
+     
+    for index,row in df_remove.iterrows():
+        Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),:] = np.nan        
+        
+    return Y
 
-
-def RemoveOutliersMMDM(x_in,hard_max=False,hard_min=False):
+def SavePeriod(x_in,df_save):    
     
-    return 0 
+    Y = x_in.copy(deep=True)
+    mark_index_not = x_in.index    
+    
+    for index,row in df_save.iterrows():
+        Y = Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),:]
+        mark_index_not = mark_index_not[np.logical_and(mark_index_not>=row[0],mark_index_not<=row[1])]    
+    
+    return Y,mark_index_not
+
+
+def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_periods = pd.DataFrame([])):
+        
+    Y = x_in.copy(deep=True)    
+    
+    Y[Y>=hard_max] = np.nan
+    Y[Y<=hard_min] = np.nan
+    
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+
+    return Y
+
+def RemoveOutliersHistoGram(x_in,df_avoid_periods = pd.DataFrame([]),min_number_of_samples_limit=12):
+    
+    Y = x_in.copy(deep=True)
+    
+    #Remove outliers ouside the avoid period 
+    Y_int = IntegrateHour(Y,sample_freq = 5)    
+    Y_int = Y_int.reset_index(drop=True)    
+    
+    for col in Y_int:
+        Y_int[col] = Y_int[col].sort_values(ascending=False,ignore_index=True)
+    
+    if(Y_int.shape[0]<min_number_of_samples_limit):
+        min_number_of_samples_limit = Y_int.shape[0]
+    
+    threshold_max =  Y_int.iloc[min_number_of_samples_limit+1,:]
+    threshold_min =  Y_int.iloc[-min_number_of_samples_limit-1,:]
+        
+    for col in Y:
+        Y.loc[np.logical_or(Y[col]>threshold_max[col],Y[col]<threshold_min[col]),col] = np.nan
+            
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+     
+    return Y
+
+
+def RemoveOutliersAEAMAD(x_in,df_avoid_periods = pd.DataFrame([])):
+    
+    Y = x_in.copy(deep=True)  
+    
+    return Y
 
 if __name__ == "__main__":
     
@@ -417,22 +467,29 @@ if __name__ == "__main__":
     dummy_manobra = pd.read_csv('BancoManobras.csv',names=['EQ','ALIM1', 'ALIM2', 'data_inicio',"data_final"],skiprows=1,parse_dates=True)
     dummy_manobra = dummy_manobra.iloc[:,-2:]
     
+    dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
     
     dummy = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-
-
+    
+    
+    output = RemoveOutliersAEAMAD(dummy,df_avoid_periods = dummy_manobra)
+    
+    #TESTED - OK #output = RemoveOutliersHistoGram(dummy,df_avoid_periods = dummy_manobra,min_number_of_samples_limit=12)    
+    #TESTED - OK #output = RemoveOutliersHardThreshold(dummy,hard_max=13.80,hard_min=0,df_avoid_periods = dummy_manobra)    
+    #TESTED - OK #output,index = SavePeriod(dummy,dummy_manobra)    
     #TESTED - OK #dummy = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #TESTED - OK #output = ReturnOnlyValidDays(dummy,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm')
     #TESTED - OK #output = GetDayMaxMin(dummy,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max')
     #TESTED - OK #output = RemovePeriod(dummy,dummy_manobra)
     
-    output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)
+    #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)
     
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=1,pos_interpol=1,integrate=True,interpol_integrate=1)
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5)
     
     print("Time spent: " + str(time.perf_counter()-time_init) )
     
+    output.plot()
     print(output)
 
     

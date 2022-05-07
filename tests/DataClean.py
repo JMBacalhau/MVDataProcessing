@@ -33,6 +33,8 @@ def DataClean(x_in,start_date_dt,end_date_dt,sample_freq = 5,sample_time_base = 
     added_dic = {'s':'ms','m':'s','h':'m','D':'h','M':'D','Y':'M'}
     floor_dic = {'s':'S','m':'T','h':'H','D':'D','M':'M','Y':'Y'}    
         
+    x_in.index = x_in.index.tz_localize(None) #Makes the datetimeIndex naive (no time zone)
+    
     #----------------------------------------------------------------#
     #Creates a base vector that conntainXs all the samples between data_inicio and data_final filled timestamp and with nan
     
@@ -322,9 +324,7 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
             #FALTA ESCREVER UMA DEFAULT E PERMITIR IMPORTAR
         
     return Y
-    
-
-    
+        
 def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
         
     #ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
@@ -371,7 +371,6 @@ def SavePeriod(x_in,df_save):
     
     return Y,mark_index_not
 
-
 def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_periods = pd.DataFrame([])):
         
     Y = x_in.copy(deep=True)    
@@ -411,10 +410,85 @@ def RemoveOutliersHistoGram(x_in,df_avoid_periods = pd.DataFrame([]),min_number_
      
     return Y
 
-
 def RemoveOutliersAEAMAD(x_in,df_avoid_periods = pd.DataFrame([])):
     
     Y = x_in.copy(deep=True)  
+    
+    X = x_in.copy(deep=True)  
+          
+    # ------------------------ OUTLIERS ------------------------        
+    print("Processado outliers...")
+
+    X_mark_outlier = np.empty((len(Y[:,0]),4),dtype=bool)  
+    X_mark_outlier[:,:] = False
+    
+    
+    #---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL   
+    X_mad = np.copy(x_in)
+    X_mad_aux = np.copy(x_in)
+    X_moving_median = np.copy(x_in)
+    X_moving_up = np.copy(x_in)
+    X_moving_down = np.copy(x_in)
+    
+    
+    
+    print("Processado outliers média móvel")                        
+    len_mov_avg = 4*12
+    len_mov_std = 4*12
+    std_def = 5
+    min_var_def = 1.1
+    
+    for fase in range(-4,0):
+       
+       #warnings.filterwarnings("ignore")#Ignora os warnings de cálculo de média móvel com np.nan
+       print("-Processando Média Móvel fase: " + str(fase))
+                          
+       #------------ Computa Mediana Móvel ------------#                      
+       X_moving_median[:,fase] = pd.Series(X[:,fase]).rolling(len_mov_std).median().values           
+       X_moving_median[:,fase] = np.roll(X_moving_median[:,fase], -int(len_mov_avg/2))        
+       
+       if(len(X_moving_median[~np.isnan(X_moving_median[:,fase].astype(float)),fase])!=0):                   
+           X_moving_median[:int(len_mov_avg/2),fase] = np.mean(X_moving_median[~np.isnan(X_moving_median[:,fase].astype(float)),fase])
+           X_moving_median[-int(len_mov_avg/2):,fase] = np.mean(X_moving_median[~np.isnan(X_moving_median[:,fase].astype(float)),fase])
+       
+       else:
+            X_moving_median[:int(len_mov_avg/2),fase] = np.nan
+            X_moving_median[-int(len_mov_avg/2):,fase] = np.nan
+       
+       #------------ Computa MAD Móvel ------------#
+       X_mad_aux[:,fase]  = np.abs(X[:,fase]-X_moving_median[:,fase])
+       X_mad[:,fase] = pd.Series(X_mad_aux[:,fase]).rolling(len_mov_std).median().values   
+       X_mad[:,fase] = np.roll(X_mad[:,fase], -int(len_mov_avg/2))        
+       
+       if(len(X_mad[~np.isnan(X_mad[:,fase].astype(float)),fase])!=0):
+           X_mad[:int(len_mov_std/2),fase] = np.mean(X_mad[~np.isnan(X_mad[:,fase].astype(float)),fase])
+           X_mad[-int(len_mov_std/2):,fase] = np.mean(X_mad[~np.isnan(X_mad[:,fase].astype(float)),fase])  
+       else:               
+           X_mad[:int(len_mov_std/2),fase] = np.nan
+           X_mad[-int(len_mov_std/2):,fase] = np.nan
+       
+       #------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#
+       X_mad[X_mad[:,fase]<=min_var_def,fase] = min_var_def
+       
+       #------------ MAD Móvel Limites ------------#
+       X_moving_up[:,fase] = X_moving_median[:,fase]+std_def*X_mad[:,fase] 
+       X_moving_down[:,fase] = X_moving_median[:,fase]-std_def*X_mad[:,fase]     
+      
+       X_moving_down[X_moving_down[:,fase]<=0,fase] = 0
+           
+       #------------ Marcando outliers ------------#
+       X_mark = np.logical_or(X[:,fase]>=X_moving_up[:,fase],X[:,fase]<=X_moving_down[:,fase])
+       
+       #------------ Não marca os intervalos onde não foi possível determinar ------------#   
+       X_mark[np.isnan(X_moving_up[:,fase].astype(float))] = False
+       
+       X_mark[:int(len_mov_std/2)] = False
+       X_mark[-int(len_mov_std/2)] = False
+       
+       X[X_mark,fase] = np.nan
+       X_mark_outlier[X_mark,fase]=True  
+       
+       
     
     return Y
 

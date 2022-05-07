@@ -6,7 +6,7 @@ Created on Mon Apr 18 06:45:44 2022
 """
 
 """
-Remove outliers (hist,quartile,MAD)
+Verificar se todos os d_avoid_ estao implementados
 Proporção entre fases
 Input
 
@@ -18,8 +18,7 @@ import datetime as dt
 import numpy as np
 from datetime import datetime
 from itertools import combinations
-from scipy import stats
-import matplotlib.pyplot as plt
+
  
 #pd.set_option('display.max_rows', None)
 #pd.set_option('display.max_columns', None)

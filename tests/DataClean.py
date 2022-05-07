@@ -10,6 +10,8 @@ Verificar se todos os d_avoid_ estao implementados
 Proporção entre fases
 Input
 
+Raise exception and erros
+
 """
 
 
@@ -17,7 +19,7 @@ import pandas as pd
 import datetime as dt
 import numpy as np
 from datetime import datetime
-from itertools import combinations
+
 
  
 #pd.set_option('display.max_rows', None)
@@ -26,10 +28,22 @@ from itertools import combinations
 #pd.set_option('display.max_colwidth', None)
 
 
-def DataClean(x_in,start_date_dt,end_date_dt,sample_freq = 5,sample_time_base = 'm'):    
-    
-    #np.timedelta64 -> (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
-    #x_in = dummy.copy(deep=True)
+def DataClean(x_in: pd.DataFrame,
+              start_date_dt: datetime,
+              end_date_dt: datetime,
+              sample_freq: int = 5,
+              sample_time_base: str = 'm') -> pd.DataFrame:        
+    """np.timedelta64 -> (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
+    x_in = dummy.copy(deep=True)
+
+    :param x_in: param start_date_dt: datetime:
+    :param end_date_dt: param sample_freq:  (Default value = 5)
+    :param sample_time_base: Default value = 'm')
+    :param start_date_dt: datetime: 
+    :param sample_freq:  (Default value = 5)
+    :param sample_time_base: str:  (Default value = 'm')
+
+    """
     
     added_dic = {'s':'ms','m':'s','h':'m','D':'h','M':'D','Y':'M'}
     floor_dic = {'s':'S','m':'T','h':'H','D':'D','M':'M','Y':'Y'}    
@@ -141,7 +155,15 @@ def DataClean(x_in,start_date_dt,end_date_dt,sample_freq = 5,sample_time_base = 
     
     return Y
 
-def IntegrateHour(Y,sample_freq = 5):
+def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5) -> pd.DataFrame:
+    """
+
+    :param Y: param sample_freq:  (Default value = 5)
+    :param sample_freq:  (Default value = 5)
+
+    """
+    
+    Y = x_in.copy(deep=True)
     
     time_vet_stamp = Y.index[np.arange(0,len(Y.index),int(60/sample_freq))]    
     Y = Y.groupby([Y.index.year,Y.index.month,Y.index.day,Y.index.hour]).mean() 
@@ -151,13 +173,23 @@ def IntegrateHour(Y,sample_freq = 5):
     
     return Y
 
-def Correlation(X):
+def Correlation(X: pd.DataFrame) -> float:
+    """
+
+    :param X: 
+
+    """
     
     corr_value = X.corr()[X.corr()!=1].mean().mean()
     
     return corr_value
     
-def DayPeriodMapper(hour):
+def DayPeriodMapper(hour: int) -> int:
+    """
+
+    :param hour: 
+
+    """
     return (
         0 if 0 <= hour < 6
         else
@@ -169,6 +201,13 @@ def DayPeriodMapper(hour):
     )
 
 def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
+    """
+
+    :param X: param sample_freq:  (Default value = 5)
+    :param threshold_accept: Default value = 0.75)
+    :param sample_freq:  (Default value = 5)
+
+    """
     
     Y = X.copy(deep=True)
     
@@ -213,6 +252,14 @@ def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
     return Y
 
 def ReturnOnlyValidDays(x_in,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm'):
+    """
+
+    :param x_in: param sample_freq:  (Default value = 5)
+    :param threshold_accept: Default value = 1.0)
+    :param sample_time_base: Default value = 'm')
+    :param sample_freq:  (Default value = 5)
+
+    """
     
     X = x_in.copy(deep=True)
     
@@ -246,6 +293,16 @@ def ReturnOnlyValidDays(x_in,sample_freq = 5,threshold_accept = 1.0,sample_time_
     return X,df_count
 
 def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max'):
+    """
+
+    :param x_in: param start_date_dt:
+    :param end_date_dt: param sample_freq:  (Default value = 5)
+    :param threshold_accept: Default value = 1.0)
+    :param exe_param: Default value = 'max')
+    :param start_date_dt: 
+    :param sample_freq:  (Default value = 5)
+
+    """
     
     X = x_in.copy(deep=True)
     
@@ -268,6 +325,15 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
     return Y
 
 def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_day = 3,min_sample_per_workday = 9):
+    """
+
+    :param x_in: param sample_freq:  (Default value = 5)
+    :param threshold_accept: Default value = 1.0)
+    :param min_sample_per_day: Default value = 3)
+    :param min_sample_per_workday: Default value = 9)
+    :param sample_freq:  (Default value = 5)
+
+    """
     
     #x_in = dummy.copy(deep=True)
     
@@ -327,6 +393,19 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
     return Y
         
 def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
+    """
+
+    :param X: param start_date_dt:
+    :param end_date_dt: param sample_freq:  (Default value = 5)
+    :param pre_interpol: Default value = False)
+    :param pos_interpol: Default value = False)
+    :param prop_phases: Default value = False)
+    :param integrate: Default value = False)
+    :param interpol_integrate: Default value = False)
+    :param start_date_dt: 
+    :param sample_freq:  (Default value = 5)
+
+    """
         
     #ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
     
@@ -353,6 +432,12 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     return Y
 
 def RemovePeriod(x_in,df_remove):
+    """
+
+    :param x_in: param df_remove:
+    :param df_remove: 
+
+    """
     
     Y = x_in.copy(deep=True)    
      
@@ -362,6 +447,12 @@ def RemovePeriod(x_in,df_remove):
     return Y
 
 def SavePeriod(x_in,df_save):    
+    """
+
+    :param x_in: param df_save:
+    :param df_save: 
+
+    """
     
     Y = x_in.copy(deep=True)
     mark_index_not = x_in.index    
@@ -373,6 +464,14 @@ def SavePeriod(x_in,df_save):
     return Y,mark_index_not
 
 def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_periods = pd.DataFrame([])):
+    """
+
+    :param x_in: param hard_max:  (Default value = False)
+    :param hard_min: Default value = False)
+    :param df_avoid_periods: Default value = pd.DataFrame([]))
+    :param hard_max:  (Default value = False)
+
+    """
         
     Y = x_in.copy(deep=True)    
     
@@ -385,7 +484,16 @@ def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_peri
 
     return Y
 
-def RemoveOutliersHistoGram(x_in,df_avoid_periods = pd.DataFrame([]),min_number_of_samples_limit=12):
+def RemoveOutliersHistoGram(x_in: pd.DataFrame,
+                            df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
+                            min_number_of_samples_limit: int  =12) -> pd.DataFrame:
+    """
+
+    :param x_in: param df_avoid_periods:  (Default value = pd.DataFrame([]))
+    :param min_number_of_samples_limit: Default value = 12)
+    :param df_avoid_periods:  (Default value = pd.DataFrame([]))
+
+    """
     
     Y = x_in.copy(deep=True)
     
@@ -411,15 +519,17 @@ def RemoveOutliersHistoGram(x_in,df_avoid_periods = pd.DataFrame([]),min_number_
      
     return Y
 
-
 def CalcUnbalance(x_in):
-    '''
-    Calculates the unbalance between phases for every timestamp.
+    """Calculates the unbalance between phases for every timestamp.
     
-    Equation: Y = (MAX-MEAN)/MEAN
+    Equation:
+        Y = (MAX-MEAN)/MEAN
     
     Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
-    '''
+
+    :param x_in: 
+
+    """
     
     Y = pd.DataFrame([],index=x_in.index)    
     
@@ -427,8 +537,14 @@ def CalcUnbalance(x_in):
     
     return Y
 
-#TERMINAR DE IMPLEMENTAR
 def RemoveOutliersQuantile(x_in,col_names = [],drop=False):
+    """
+
+    :param x_in: param col_names:  (Default value = [])
+    :param drop: Default value = False)
+    :param col_names:  (Default value = [])
+
+    """
     
     Y = x_in.copy(deep=True)
     
@@ -449,12 +565,20 @@ def RemoveOutliersQuantile(x_in,col_names = [],drop=False):
     
     return Y
 
+def RemoveOutliersMMADMM(x_in,df_avoid_periods = pd.DataFrame([]),len_mov_avg = 4*12,std_def = 2,min_var_def = 0.5,allow_negatives=False,plot=False):
+    """
+     (M)oving (M)edian (A)bslute (D)eviation around the (M)oving (M)edian
+     
+    :param x_in: param df_avoid_periods:  (Default value = pd.DataFrame([]))
+    :param len_mov_avg: Default value = 4*12)
+    :param std_: Default value = 2)
+    :param min_var_: Default value = 0.5)
+    :param allow_negatives: Default value = False)
+    :param plot: Default value = False)
+    :param df_avoid_periods:  (Default value = pd.DataFrame([]))
 
-def RemoveOutliersAEAMAD(x_in,df_avoid_periods = pd.DataFrame([]),len_mov_avg = 4*12,std_def = 2,min_var_def = 0.5,allow_negatives=False,plot=False):
-    
-    x_in = dummy.copy(deep=True)      
-    x_in.iloc[35000:38000,:] = np.nan
-    
+    """
+        
     Y = x_in.copy(deep=True)  
           
     # ------------------------ OUTLIERS ------------------------        
@@ -528,7 +652,7 @@ if __name__ == "__main__":
     
     
     data_inicio='2021-01-01'
-    data_final='2021-06-01'
+    data_final='2022-01-01'
     
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
@@ -571,15 +695,16 @@ if __name__ == "__main__":
     
     dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
     
-    dummy = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
+    output = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     
     #output = RemoveOutliersHardThreshold(dummy,hard_max=14.5,hard_min=0)    
     #output = RemoveOutliersQuantile(output)
-    #output = RemoveOutliersAEAMAD(output)        
+    #output = RemoveOutliersMMADMM(output)        
     #output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12)    
     
-    output = RemoveOutliersAEAMAD(dummy,df_avoid_periods = dummy_manobra)
     
+    
+    #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
     #TESTED - OK #output = RemoveOutliersQuantile(dummy,col_names = [],drop=False)
     #TESTED - OK #output = RemoveOutliersHistoGram(dummy,df_avoid_periods = dummy_manobra,min_number_of_samples_limit=12)    

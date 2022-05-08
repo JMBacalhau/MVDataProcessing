@@ -1,25 +1,56 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Apr 18 06:45:44 2022
 
 @author: Bacalhau
-"""
 
-"""
 Verificar se todos os d_avoid_ estao implementados
+Raise exception and erros
+
+
 Proporção entre fases
 Input
 
-Raise exception and erros
+
+Example Google style docstrings.
+
+This module demonstrates documentation as specified by the `Google
+Python Style Guide`_. Docstrings may extend over multiple lines.
+Sections are created with a section header and a colon followed by a
+block of indented text.
+
+Example:
+    Examples can be given using either the ``Example`` or ``Examples``
+    sections. Sections support any reStructuredText formatting, including
+    literal blocks::
+
+        $ python example_google.py
+
+Section breaks are created by resuming unindented text. Section breaks
+are also implicitly created anytime a new section starts. 
+
+Attributes:
+    module_level_variable1 (int): Module level variables may be documented in
+        either the ``Attributes`` section of the module docstring, or in an
+        inline docstring immediately following the variable.
+
+        Either form is acceptable, but the two should not be mixed. Choose
+        one convention to document module level variables and be consistent
+        with it.
+
+Todo:
+    * For module TODOs
+    * You have to also use ``sphinx.ext.todo`` extension
+
+.. _Google Python Style Guide:   
+http://google.github.io/styleguide/pyguide.html
 
 """
-
 
 import pandas as pd
 import datetime as dt
 import numpy as np
 from datetime import datetime
-
+from itertools import combinations
 
  
 #pd.set_option('display.max_rows', None)
@@ -28,20 +59,28 @@ from datetime import datetime
 #pd.set_option('display.max_colwidth', None)
 
 
-def DataClean(x_in: pd.DataFrame,
+def DataSynchronization(x_in: pd.DataFrame,
               start_date_dt: datetime,
               end_date_dt: datetime,
               sample_freq: int = 5,
               sample_time_base: str = 'm') -> pd.DataFrame:        
-    """np.timedelta64 -> (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
-    x_in = dummy.copy(deep=True)
-
-    :param x_in: param start_date_dt: datetime:
-    :param end_date_dt: param sample_freq:  (Default value = 5)
-    :param sample_time_base: Default value = 'm')
-    :param start_date_dt: datetime: 
-    :param sample_freq:  (Default value = 5)
-    :param sample_time_base: str:  (Default value = 'm')
+    """
+    The time series synchronization is the first step in processing the dataset. The synchronization is vital 
+    since the alignment between phases (φa, φb, φv) of the same quantity, between quantities (V, I, pf) of the
+    same feeder, and between feeders, provides many advantages. The first one being the ability to combine all
+    nine time series, the three-phase voltage, current, and power factor of each feeder to calculate the secondary
+    quantities (Pactive/Preactive, Eactive/Ereactive).
+    
+    Furthermore, the synchronization between feeders provides the capability to analyze the iteration between them,
+    for instance, in load transfers for scheduled maintenance and to estimate substation’s transformers quantities
+    by the sum of all feeders.
+     
+    
+    Most of the fuctions in this module assumes that the time series are "Clean" to a certain sample_freq. Therefore,
+    this fuction must be executed first on the dataset.
+    
+    sample_time_base: [np.timedelta64]: (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
+    
 
     """
     
@@ -175,8 +214,8 @@ def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5) -> pd.DataFrame:
 
 def Correlation(X: pd.DataFrame) -> float:
     """
-
-    :param X: 
+    Calculates the correlation between each column of the DataFrame and outputs the average of all.
+    
 
     """
     
@@ -186,9 +225,8 @@ def Correlation(X: pd.DataFrame) -> float:
     
 def DayPeriodMapper(hour: int) -> int:
     """
-
-    :param hour: 
-
+    Maps a given hour to one of four periods of a day.
+    
     """
     return (
         0 if 0 <= hour < 6
@@ -203,9 +241,6 @@ def DayPeriodMapper(hour: int) -> int:
 def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
     """
 
-    :param X: param sample_freq:  (Default value = 5)
-    :param threshold_accept: Default value = 0.75)
-    :param sample_freq:  (Default value = 5)
 
     """
     
@@ -251,13 +286,13 @@ def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
     
     return Y
 
-def ReturnOnlyValidDays(x_in,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm'):
+def ReturnOnlyValidDays(x_in: pd.DataFrame,
+                        sample_freq: int = 5,
+                        threshold_accept: float = 1.0,
+                        sample_time_base: str = 'm') -> pd.DataFrame:
     """
-
-    :param x_in: param sample_freq:  (Default value = 5)
-    :param threshold_accept: Default value = 1.0)
-    :param sample_time_base: Default value = 'm')
-    :param sample_freq:  (Default value = 5)
+    Returns all valid days. A valid day is one with no missing values for any 
+    of the timeseries on each column.
 
     """
     
@@ -318,7 +353,7 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
     Y.insert(0,'timestamp_day', time_vet_stamp)
     Y.set_index('timestamp_day', inplace=True)    
     
-    Y = DataClean(Y, start_date_dt, end_date_dt,sample_freq = 1,sample_time_base='D')
+    Y = DataSynchronization(Y, start_date_dt, end_date_dt,sample_freq = 1,sample_time_base='D')
     
     Y = Y.interpolate(method_type='linear')    
     
@@ -410,7 +445,7 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     #ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
     
     #Organize samples
-    Y = DataClean(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
+    Y = DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
     
     #Interpolate before proportion between phases
     if(pre_interpol!=False):
@@ -431,11 +466,9 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     
     return Y
 
-def RemovePeriod(x_in,df_remove):
+def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame) -> pd.DataFrame:
     """
-
-    :param x_in: param df_remove:
-    :param df_remove: 
+    Marks as nan all specified timestamps
 
     """
     
@@ -446,11 +479,12 @@ def RemovePeriod(x_in,df_remove):
         
     return Y
 
-def SavePeriod(x_in,df_save):    
+def SavePeriod(x_in: pd.DataFrame,df_save: pd.DataFrame) -> pd.DataFrame:    
     """
+    For a given set of periods (Start->End) returns the 
 
-    :param x_in: param df_save:
-    :param df_save: 
+    Tá bugada!!!!!!!!!
+
 
     """
     
@@ -463,13 +497,12 @@ def SavePeriod(x_in,df_save):
     
     return Y,mark_index_not
 
-def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_periods = pd.DataFrame([])):
+def RemoveOutliersHardThreshold(x_in: pd.DataFrame,
+                                hard_max: bool = False,
+                                hard_min: bool = False,
+                                df_avoid_periods = pd.DataFrame([])) -> pd.DataFrame:
     """
-
-    :param x_in: param hard_max:  (Default value = False)
-    :param hard_min: Default value = False)
-    :param df_avoid_periods: Default value = pd.DataFrame([]))
-    :param hard_max:  (Default value = False)
+    Removes outliers from the timeseries on each column using threshold.
 
     """
         
@@ -486,20 +519,23 @@ def RemoveOutliersHardThreshold(x_in,hard_max=False,hard_min=False,df_avoid_peri
 
 def RemoveOutliersHistoGram(x_in: pd.DataFrame,
                             df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
+                            integrate_hour: bool = True,
+                            sample_freq: int = 5,
                             min_number_of_samples_limit: int  =12) -> pd.DataFrame:
     """
+    Removes outliers from the timeseries on each column using the histogram.
+    The parameter 'min_number_of_samples_limit' specify the minimum amount of hours in integrate flag is True/samples
+    that a value must have to be considered not an outlier.    
 
-    :param x_in: param df_avoid_periods:  (Default value = pd.DataFrame([]))
-    :param min_number_of_samples_limit: Default value = 12)
-    :param df_avoid_periods:  (Default value = pd.DataFrame([]))
 
     """
     
     Y = x_in.copy(deep=True)
     
     #Remove outliers ouside the avoid period 
-    Y_int = IntegrateHour(Y,sample_freq = 5)    
-    Y_int = Y_int.reset_index(drop=True)    
+    if(integrate_hour):
+        Y_int = IntegrateHour(Y,sample_freq)    
+        Y_int = Y_int.reset_index(drop=True)    
     
     for col in Y_int:
         Y_int[col] = Y_int[col].sort_values(ascending=False,ignore_index=True)
@@ -519,16 +555,15 @@ def RemoveOutliersHistoGram(x_in: pd.DataFrame,
      
     return Y
 
-def CalcUnbalance(x_in):
-    """Calculates the unbalance between phases for every timestamp.
+def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates the unbalance between phases for every timestamp.
     
     Equation:
         Y = (MAX-MEAN)/MEAN
     
     Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
-
-    :param x_in: 
-
+    
     """
     
     Y = pd.DataFrame([],index=x_in.index)    
@@ -537,13 +572,13 @@ def CalcUnbalance(x_in):
     
     return Y
 
-def RemoveOutliersQuantile(x_in,col_names = [],drop=False):
+def RemoveOutliersQuantile(x_in:  pd.DataFrame,
+                           col_names: list = [],
+                           drop: bool = False) -> pd.DataFrame:
     """
-
-    :param x_in: param col_names:  (Default value = [])
-    :param drop: Default value = False)
-    :param col_names:  (Default value = [])
-
+     Removes outliers from the timeseries on each column using the top and bottom
+     quantile metric as an outlier marker.
+     
     """
     
     Y = x_in.copy(deep=True)
@@ -565,17 +600,17 @@ def RemoveOutliersQuantile(x_in,col_names = [],drop=False):
     
     return Y
 
-def RemoveOutliersMMADMM(x_in,df_avoid_periods = pd.DataFrame([]),len_mov_avg = 4*12,std_def = 2,min_var_def = 0.5,allow_negatives=False,plot=False):
+def RemoveOutliersMMADMM(x_in: pd.DataFrame,
+                         df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
+                         len_mov_avg: int = 4*12,
+                         std_def: int = 2,
+                         min_var_def: float = 0.5,
+                         allow_negatives: bool = False,
+                         plot: bool =False) -> pd.DataFrame:
     """
-     (M)oving (M)edian (A)bslute (D)eviation around the (M)oving (M)edian
+    Removes outliers from the timeseries on each column using the (M)oving (M)edian (A)bslute 
+    (D)eviation around the (M)oving (M)edian. 
      
-    :param x_in: param df_avoid_periods:  (Default value = pd.DataFrame([]))
-    :param len_mov_avg: Default value = 4*12)
-    :param std_: Default value = 2)
-    :param min_var_: Default value = 0.5)
-    :param allow_negatives: Default value = False)
-    :param plot: Default value = False)
-    :param df_avoid_periods:  (Default value = pd.DataFrame([]))
 
     """
         
@@ -695,14 +730,8 @@ if __name__ == "__main__":
     
     dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
     
-    output = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-    
-    #output = RemoveOutliersHardThreshold(dummy,hard_max=14.5,hard_min=0)    
-    #output = RemoveOutliersQuantile(output)
-    #output = RemoveOutliersMMADMM(output)        
-    #output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12)    
-    
-    
+    output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
+       
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)

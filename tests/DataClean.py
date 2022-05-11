@@ -691,8 +691,8 @@ if __name__ == "__main__":
     print("Example:")    
     
     
-    data_inicio='2020-01-01'
-    data_final='2021-01-01'
+    data_inicio='2021-01-01'
+    data_final='2022-01-01'
     
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
@@ -760,34 +760,60 @@ if __name__ == "__main__":
     output.plot()
     print(output)
 
-
-    def MeanGrouper(x_in):       
-        return x_in.mean(skipna=False)    
-        
+         
    
-    aux = dummy.copy(deep=True)
-    aux.loc[:5,'VA'] = np.nan
-    #Normalization max min each day
-    
+    x_in = output.copy(deep=True)
+    x_in.loc[:5,'VA'] = np.nan    
+    x_in.loc[:5,'VB'] = np.nan    
     time_init = time.perf_counter()    
-    grouper = aux.groupby([aux.index.year,aux.index.month,aux.index.day,aux.index.hour])        
-    mean_hour = grouper.transform(MeanGrouper)
+    
+    
+    threshold_accept = 0.75
+    
+    #HOUR
+    mask_valid = ~x_in.isnull()
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,mask_valid.index.hour])            
+    count_valid = grouper_valid.transform('sum')
+    
+    mask_null = x_in.isnull()
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,mask_null.index.hour])            
+    count_null = grouper_null.transform('sum')
+        
+    mask_reject = count_valid/(count_null+count_valid)<threshold_accept
+    
+    grouper = x_in.groupby([x_in.index.year,x_in.index.month,x_in.index.day,x_in.index.hour])            
+    x_in_mean = grouper.transform('mean')
+    
+    x_in_mean[mask_reject] = np.nan
+
+    #Make all the possible combinations between columns
+    comb_vet = list(combinations(range(0,x_in_mean.shape[1]),r=2))
+    
+    #make columns names
+    comb_vet_str = []
+    for comb in comb_vet:
+        comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
+    
+    #Create output vector
+    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    
+    for i in range(0,len(comb_vet)):        
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+    
+    df_relation.replace([np.inf, -np.inf], np.nan,inplace=True)
+    
+    x_in_mean.corr()
+    
+    
+
+    
+    #mean_hour = grouper.transform(MeanGrouper)
+    #mean_hour = grouper.transform('mean')
+    
     print("Time spent: " + str(time.perf_counter()-time_init) )
 
-    time_init = time.perf_counter()    
-    grouper = aux.groupby([aux.index.year,aux.index.month,aux.index.day])        
-    mean_hour = grouper.transform(MeanGrouper)
-    print("Time spent: " + str(time.perf_counter()-time_init) )
-  
-    time_init = time.perf_counter()    
-    grouper = aux.groupby([aux.index.year,aux.index.month])        
-    mean_hour = grouper.transform(MeanGrouper)
-    print("Time spent: " + str(time.perf_counter()-time_init) )
-    
-    time_init = time.perf_counter()    
-    grouper = aux.groupby([aux.index.year])        
-    mean_hour = grouper.transform(MeanGrouper)
-    print("Time spent: " + str(time.perf_counter()-time_init) )
-    
+
             
     

@@ -58,7 +58,7 @@ from itertools import combinations
 #pd.set_option('display.width', None)
 #pd.set_option('display.max_colwidth', None)
 
-
+#BUG Some sample_freq have trouble lol.
 def DataSynchronization(x_in: pd.DataFrame,
               start_date_dt: datetime,
               end_date_dt: datetime,
@@ -194,17 +194,20 @@ def DataSynchronization(x_in: pd.DataFrame,
     
     return Y
 
-def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5) -> pd.DataFrame:
+#TODO not yet tested with other time samples
+def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pd.DataFrame:
     """
 
     :param Y: param sample_freq:  (Default value = 5)
     :param sample_freq:  (Default value = 5)
 
     """
+    hour_divider = {'s':60*60,'m':60}
+
     
     Y = x_in.copy(deep=True)
     
-    time_vet_stamp = Y.index[np.arange(0,len(Y.index),int(60/sample_freq))]    
+    time_vet_stamp = Y.index[np.arange(0,len(Y.index),int(hour_divider[sample_time_base]/sample_freq))]    
     Y = Y.groupby([Y.index.year,Y.index.month,Y.index.day,Y.index.hour]).mean() 
     Y = Y.reset_index(drop=True)
     Y.insert(0,'timestamp', time_vet_stamp)
@@ -214,8 +217,7 @@ def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5) -> pd.DataFrame:
 
 def Correlation(X: pd.DataFrame) -> float:
     """
-    Calculates the correlation between each column of the DataFrame and outputs the average of all.
-    
+    Calculates the correlation between each column of the DataFrame and outputs the average of all.    
 
     """
     
@@ -238,21 +240,23 @@ def DayPeriodMapper(hour: int) -> int:
         3
     )
 
-def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
+#TODO
+def PhaseProportonInput(x_in,sample_freq = 5,threshold_accept = 0.75):
     """
 
 
     """
+    x_in = dummy.copy(deep=True)
     
-    Y = X.copy(deep=True)
+    Y = x_in.copy(deep=True)
     
     #Get number of samples that has at leat two phases to calculate unbalance
-    number_of_possible_unbalace_calc = np.sum(np.sum(~X.isnull(),axis=1)>=2)
+    number_of_possible_unbalace_calc = np.sum(np.sum(~x_in.isnull(),axis=1)>=2)
     
-    if(number_of_possible_unbalace_calc>=X.shape[0]*0.3):#at least 30% of data
+    if(number_of_possible_unbalace_calc>=x_in.shape[0]*0.3):#at least 30% of data
         
         #Make all the possible combinations between columns
-        comb_vet = list(combinations(range(0,X.shape[1]),r=2))
+        comb_vet = list(combinations(range(0,x_in.shape[1]),r=2))
         
         #make columns names
         comb_vet_str = []
@@ -260,13 +264,13 @@ def PhaseProportonInput(X,sample_freq = 5,threshold_accept = 0.75):
             comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
         
         #Create output vector
-        df_relation = pd.DataFrame(index=X.index,columns=comb_vet_str, dtype=object)        
+        df_relation = pd.DataFrame(index=x_in.index,columns=comb_vet_str, dtype=object)        
         
         for i in range(0,len(comb_vet)):
             
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            df_relation.loc[:,comb_str] = X.iloc[:,list(comb)].iloc[:,0]/X.iloc[:,list(comb)].iloc[:,1]
+            df_relation.loc[:,comb_str] = x_in.iloc[:,list(comb)].iloc[:,0]/x_in.iloc[:,list(comb)].iloc[:,1]
         
         df_relation.replace([np.inf, -np.inf], np.nan,inplace=True)
         
@@ -426,7 +430,8 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
             #FALTA ESCREVER UMA DEFAULT E PERMITIR IMPORTAR
         
     return Y
-        
+   
+#TODO     
 def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
     """
 
@@ -479,7 +484,7 @@ def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame) -> pd.DataFrame:
         
     return Y
 
-def SavePeriod(x_in: pd.DataFrame,df_save: pd.DataFrame) -> pd.DataFrame:    
+def SavePeriod(x_in: pd.DataFrame,df_save: pd.DataFrame) -> tuple:    
     """
     For a given set of periods (Start->End) returns the 
 
@@ -553,23 +558,6 @@ def RemoveOutliersHistoGram(x_in: pd.DataFrame,
         df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
         Y.loc[index_return,:] = df_values
      
-    return Y
-
-def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculates the unbalance between phases for every timestamp.
-    
-    Equation:
-        Y = (MAX-MEAN)/MEAN
-    
-    Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
-    
-    """
-    
-    Y = pd.DataFrame([],index=x_in.index)    
-    
-    Y['Unbalance'] = 100*(x_in.max(axis=1)-x_in.mean(axis=1))/x_in.mean(axis=1)
-    
     return Y
 
 def RemoveOutliersQuantile(x_in:  pd.DataFrame,
@@ -679,6 +667,23 @@ def RemoveOutliersMMADMM(x_in: pd.DataFrame,
            
     return Y
 
+def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates the unbalance between phases for every timestamp.
+    
+    Equation:
+        Y = (MAX-MEAN)/MEAN
+    
+    Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
+    
+    """
+    
+    Y = pd.DataFrame([],index=x_in.index)    
+    
+    Y['Unbalance'] = 100*(x_in.max(axis=1)-x_in.mean(axis=1))/x_in.mean(axis=1)
+    
+    return Y
+
 if __name__ == "__main__":
     
     import time
@@ -686,8 +691,8 @@ if __name__ == "__main__":
     print("Example:")    
     
     
-    data_inicio='2021-01-01'
-    data_final='2022-01-01'
+    data_inicio='2020-01-01'
+    data_final='2021-01-01'
     
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
@@ -755,6 +760,34 @@ if __name__ == "__main__":
     output.plot()
     print(output)
 
+
+    def MeanGrouper(x_in):       
+        return x_in.mean(skipna=False)    
+        
+   
+    aux = dummy.copy(deep=True)
+    aux.loc[:5,'VA'] = np.nan
+    #Normalization max min each day
     
+    time_init = time.perf_counter()    
+    grouper = aux.groupby([aux.index.year,aux.index.month,aux.index.day,aux.index.hour])        
+    mean_hour = grouper.transform(MeanGrouper)
+    print("Time spent: " + str(time.perf_counter()-time_init) )
+
+    time_init = time.perf_counter()    
+    grouper = aux.groupby([aux.index.year,aux.index.month,aux.index.day])        
+    mean_hour = grouper.transform(MeanGrouper)
+    print("Time spent: " + str(time.perf_counter()-time_init) )
+  
+    time_init = time.perf_counter()    
+    grouper = aux.groupby([aux.index.year,aux.index.month])        
+    mean_hour = grouper.transform(MeanGrouper)
+    print("Time spent: " + str(time.perf_counter()-time_init) )
     
+    time_init = time.perf_counter()    
+    grouper = aux.groupby([aux.index.year])        
+    mean_hour = grouper.transform(MeanGrouper)
+    print("Time spent: " + str(time.perf_counter()-time_init) )
+    
+            
     

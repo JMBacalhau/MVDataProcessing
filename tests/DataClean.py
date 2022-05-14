@@ -742,6 +742,9 @@ if __name__ == "__main__":
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)    
     
     
+    output.loc[output.index>=dt.datetime(2021,10,26),'IV'] = np.nan
+    
+    
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
@@ -768,6 +771,7 @@ if __name__ == "__main__":
          
    
     x_in = output.copy(deep=True)
+    x_in = x_in.loc[:,['IA','IB','IV']]
     #x_in.iloc[0:10000,2] = np.nan    
     
     time_init = time.perf_counter()    

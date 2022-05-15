@@ -6,9 +6,18 @@ Created on Mon Apr 18 06:45:44 2022
 Verificar se todos os d_avoid_ estao implementados
 Raise exception and erros
 
-
 Proporção entre fases
 Input
+ToPDF
+
+
+raise
+assert
+LOGGGER
+
+
+
+
 
 
 Example Google style docstrings.
@@ -57,6 +66,30 @@ from itertools import permutations
 #pd.set_option('display.max_columns', None)
 #pd.set_option('display.width', None)
 #pd.set_option('display.max_colwidth', None)
+
+
+def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_for: int = 0):
+    """
+    
+    
+    time_stopper.append(['DataSynchronization',time.perf_counter()])
+    """
+    
+    
+    if(show):
+        print("Profile: " + name)
+        time_stopper = pd.DataFrame(time_stopper,columns=['Type','time'])    
+        #time_stopper['time'] = time_stopper['time']-time_stopper['time'].min()    
+        time_stopper['Delta'] = time_stopper['time'] - time_stopper['time'].shift(periods=1, fill_value=0)    
+        time_stopper = time_stopper.iloc[1:,:]
+        time_stopper['%'] =  np.round(100*time_stopper['Delta']/time_stopper['Delta'].sum(),2)
+        total_estimate = time_stopper['Delta'].sum()
+        time_stopper = time_stopper.append(pd.DataFrame([['Total',np.nan,time_stopper['Delta'].sum(),100]],columns=['Type','time','Delta','%']))    
+        print(time_stopper)
+        if(estimate_for!=0):
+            print(f"Estimation for {estimate_for} runs: {np.round(total_estimate*estimate_for/(60*60),2)} hours.")
+
+    return
 
 #BUG Some sample_freq have trouble lol.
 def DataSynchronization(x_in: pd.DataFrame,
@@ -272,36 +305,46 @@ def YearPeriodMapperVet(month: pd.Series) -> pd.Series:
 
 #TODO PUT COUMNS KEEP OUT
 #TODO TEST
-def PhaseProportonInput(x_in,threshold_accept = 0.75):
+def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     """
 
 
     """
-    
+    time_stopper = []
+    time_stopper.append(['Init',time.perf_counter()])
+    X = x_in.copy(deep=True)   
+
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)
+
+
     #make output vector
-    Y = x_in.copy(deep=True)    
+    Y = X.copy(deep=True)    
     
+    time_stopper.append(['Copy',time.perf_counter()])
     #-------------------------#
     #          HOUR           #
     #-------------------------#
 
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,mask_valid.index.hour])                   
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,mask_null.index.hour])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([x_in.index.year,x_in.index.month,x_in.index.day,x_in.index.hour])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day,X.index.hour])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
+    
+    time_stopper.append(['Hour-Group',time.perf_counter()])
     
     
     #make columns names
@@ -310,15 +353,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -327,40 +370,43 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     
     df_relation.replace([np.inf, -np.inf], np.nan,inplace=True)
     
+    time_stopper.append(['Hour-Corr',time.perf_counter()])
     
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
+    time_stopper.append(['Hour-Relation',time.perf_counter()])
 
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
-        
-
+    time_stopper.append(['Hour-Y',time.perf_counter()])
+    
+    time_stopper.append(['Hour',time.perf_counter()])
     #-------------------------#
     #          PATAMR         #
     #-------------------------#
 
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,DayPeriodMapperVet(mask_valid.index.hour)]) 
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([x_in.index.year,x_in.index.month,x_in.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
     
     
     #make columns names
@@ -369,15 +415,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -390,7 +436,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
     for i in range(0,len(comb_vet)):        
@@ -399,28 +445,28 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
 
 
-
+    time_stopper.append(['Patamar',time.perf_counter()])
     #-------------------------#
     #          DAY            #
     #-------------------------#
     
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day])                   
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([x_in.index.year,x_in.index.month,x_in.index.day])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
     
     
     #make columns names
@@ -429,15 +475,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -450,7 +496,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
     for i in range(0,len(comb_vet)):        
@@ -458,27 +504,28 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_str = comb_vet_str[i]
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
       
+    time_stopper.append(['Day',time.perf_counter()])
     #-------------------------#
     #          MONTH          #
     #-------------------------#
     
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month])                   
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([x_in.index.year,x_in.index.month])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([X.index.year,X.index.month])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
     
     
     #make columns names
@@ -487,15 +534,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -508,7 +555,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
     for i in range(0,len(comb_vet)):        
@@ -516,28 +563,28 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_str = comb_vet_str[i]
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
         
-        
+    time_stopper.append(['Month',time.perf_counter()])
     #-------------------------#
     #       HUMID/DRY         #
     #-------------------------#
     
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])                   
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([YearPeriodMapperVet(mask_valid.index.month)])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
     
     
     #make columns names
@@ -546,15 +593,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -567,7 +614,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
     for i in range(0,len(comb_vet)):        
@@ -575,27 +622,29 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_str = comb_vet_str[i]
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
       
+    time_stopper.append(['Season',time.perf_counter()])
+    
     #-------------------------#
     #          YEAR           #
     #-------------------------#
     
-    mask_valid = ~x_in.isnull()
+    mask_valid = ~X.isnull()
     grouper_valid = mask_valid.groupby([mask_valid.index.year])                   
     count_valid = grouper_valid.transform('sum')
     
-    mask_null = x_in.isnull()
+    mask_null = X.isnull()
     grouper_null = mask_null.groupby([mask_null.index.year])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = x_in.groupby([x_in.index.year])                     
-    x_in_mean = grouper.transform('mean')
+    grouper = X.groupby([X.index.year])                     
+    X_mean = grouper.transform('mean')
     
-    x_in_mean[mask_reject] = np.nan
+    X_mean[mask_reject] = np.nan
 
     #Make all the possible permutations between columns    
-    comb_vet = list(permutations(range(0,x_in_mean.shape[1]),r=2))
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
     
     
     #make columns names
@@ -604,15 +653,15 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
     
     #Create relation vector
-    df_relation = pd.DataFrame(index=x_in_mean.index,columns=comb_vet_str, dtype=object)        
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
     
     corr_vet =[]
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = x_in_mean.iloc[:,list(comb)].iloc[:,0]/x_in_mean.iloc[:,list(comb)].iloc[:,1]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
         
-        corr = x_in_mean.iloc[:,list(comb)].iloc[:,0].corr(x_in_mean.iloc[:,list(comb)].iloc[:,1])
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
         corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
     
     corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
@@ -625,14 +674,25 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*x_in.iloc[:,list(comb)[1]]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
-       
+    
+    time_stopper.append(['Year',time.perf_counter()])
+    
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pd.concat([Y,x_in.loc[:,remove_from_process]])
+    
+    
+    time_stopper.append(['Final',time.perf_counter()])
+    
+    TimeProfile(time_stopper,name='Phase',show=False)
+
     
     return Y
 
@@ -1030,6 +1090,8 @@ def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
     
     return Y
 
+
+
 if __name__ == "__main__":
     
     import time
@@ -1049,10 +1111,10 @@ if __name__ == "__main__":
         
     dummy = pd.DataFrame(dummy,columns=['timestamp'])
     
-    dummy['VA'] = dummy['timestamp'].dt.hour
-    dummy['VB'] = dummy['timestamp'].dt.minute*2
-    dummy['VV'] = dummy['timestamp'].dt.minute*3
-    dummy['VN'] = dummy['timestamp'].dt.minute*4
+    dummy['IA'] = dummy['timestamp'].dt.day
+    dummy['IB'] = dummy['timestamp'].dt.day*2
+    dummy['IV'] = dummy['timestamp'].dt.day*3
+    dummy['IN'] = dummy['timestamp'].dt.day*4
     
     #dummy['VA'] = 1
     #dummy['VB'] = 2
@@ -1069,6 +1131,7 @@ if __name__ == "__main__":
     
     time_init = time.perf_counter()    
     
+    
     #TESTE
     dummy = pd.read_csv('CALADJ2074_I.csv',names=['timestamp_aux','IA', 'IB', 'IV','IN'],skiprows=1,parse_dates=True)
     dummy.insert(loc=0, column='timestamp', value=pd.to_datetime(dummy.timestamp_aux.astype(str)))
@@ -1080,18 +1143,38 @@ if __name__ == "__main__":
     dummy_manobra = dummy_manobra.iloc[:,-2:]
     
     dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
-    time_init = time.perf_counter()    
+   
+   
+    time_stopper = []    
+    time_stopper.append(['time_init',time.perf_counter()])
     output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-    
+    #output.plot()
+    time_stopper.append(['DataSynchronization',time.perf_counter()])
     output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
-    #output = RemoveOutliersMMADMM(output,len_mov_avg=8,std_def=3)    
+    time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])
+    output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4)   
+    time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
     output = RemoveOutliersQuantile(output,drop=False)    
-    output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)    
+    time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
+    output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
+    time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
+    #output.plot()       
+    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
+    time_stopper.append(['GetDayMaxMin',time.perf_counter()])
+    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')
+    time_stopper.append(['GetDayMaxMin',time.perf_counter()])
+
     
     
-    output.loc[output.index>=dt.datetime(2021,10,26),'IV'] = np.nan
+    #for i in time_stopper.shape[0]:
+        
     
     
+    
+    
+    output = PhaseProportonInput(output,threshold_accept = 0.75,remove_from_process=['IN'])
+    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    #output.plot()
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
@@ -1110,20 +1193,14 @@ if __name__ == "__main__":
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=1,pos_interpol=1,integrate=True,interpol_integrate=1)
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5)
     
-  
-    #dummy.plot()
-    #output.plot()
-    print(output)
-
-         
-   
-    x_in = output.copy(deep=True)
-    x_in = x_in.loc[:,['IA','IB','IV']]
-    #x_in.iloc[0:10000,2] = np.nan    
-    Y = PhaseProportonInput(x_in,threshold_accept = 0.20)
     
+    
+    #------------------#
+    #   CODE PROFILE   #
+    #------------------#
+    
+    TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
 
-    print("Time spent: " + str(time.perf_counter()-time_init) )
 
 
             

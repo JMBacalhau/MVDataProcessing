@@ -3,18 +3,34 @@ Created on Mon Apr 18 06:45:44 2022
 
 @author: Bacalhau
 
-Verificar se todos os d_avoid_ estao implementados
-Raise exception and erros
+Part1
 
-Proporção entre fases
-Input
-ToPDF
+1) Proporção entre fases
+2) raise
+3) assert
+4) LOGGGER
+5) Verificar se todos os d_avoid_ estao implementados
+6) Raise exception and erros
 
 
-raise
-assert
-LOGGGER
+Part2
+1) Input
 
+
+Part3
+
+1) Reports
+2) Graphs
+3) ToPDF
+
+
+Part4
+
+1) Publish
+
+Part5
+
+1) Test on 2021 dataset
 
 
 
@@ -70,9 +86,32 @@ from itertools import permutations
 
 def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_for: int = 0):
     """
+    Simple code profiler.
     
+    How to use:
+    Create a list ->  time_stopper = []    
     
-    time_stopper.append(['DataSynchronization',time.perf_counter()])
+    Put a -> time_stopper.append(['time_init',time.perf_counter()]) at the beginning.
+    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the fist parameter beeing a name and
+    the second beeing the time.
+    Call this function at the end.
+    
+    Example.
+    
+    time_stopper.append(['time_init',time.perf_counter()])
+    
+    func1()
+    time_stopper.append(['func1',time.perf_counter()])
+    func2()
+    time_stopper.append(['func2',time.perf_counter()])
+    func3()
+    time_stopper.append(['func3',time.perf_counter()])
+    func4()
+    time_stopper.append(['func4',time.perf_counter()])
+     
+    TimeProfile(time_stopper,'My Profiler',show=True,estimate_for=500)
+    
+    The estimate_for parameter makes the calculation as if you would run x times the code analyzed;
     """
     
     
@@ -288,7 +327,6 @@ def DayPeriodMapperVet(hour: pd.Series) -> pd.Series:
     
     return hour
 
-
 def YearPeriodMapperVet(month: pd.Series) -> pd.Series:
     """
     Maps a given hour to one of four periods of a day.
@@ -302,14 +340,15 @@ def YearPeriodMapperVet(month: pd.Series) -> pd.Series:
     
     return month
 
-
-#TODO PUT COUMNS KEEP OUT
 #TODO TEST
 def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     """
 
 
     """
+    
+    x_in = output.copy(deep=True)
+    
     time_stopper = []
     time_stopper.append(['Init',time.perf_counter()])
     X = x_in.copy(deep=True)   
@@ -382,10 +421,14 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
+        
+        
+    
     time_stopper.append(['Hour-Y',time.perf_counter()])
     
     time_stopper.append(['Hour',time.perf_counter()])
+ 
     #-------------------------#
     #          PATAMR         #
     #-------------------------#
@@ -442,7 +485,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
 
 
     time_stopper.append(['Patamar',time.perf_counter()])
@@ -502,7 +545,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
       
     time_stopper.append(['Day',time.perf_counter()])
     #-------------------------#
@@ -561,7 +604,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
         
     time_stopper.append(['Month',time.perf_counter()])
     #-------------------------#
@@ -620,7 +663,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
       
     time_stopper.append(['Season',time.perf_counter()])
     
@@ -680,13 +723,13 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     for i in range(0,len(comb_vet)):        
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
-        Y.loc[Y.iloc[:,list(comb)[0]].isnull(),Y.columns[list(comb)[0]]] = df_relation.loc[Y.iloc[:,list(comb)[0]].isnull(),comb_str]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
     
     time_stopper.append(['Year',time.perf_counter()])
-    
+
     #return the keep out columns
     if(len(remove_from_process)>0):           
-        Y = pd.concat([Y,x_in.loc[:,remove_from_process]])
+        Y = pd.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
     
     
     time_stopper.append(['Final',time.perf_counter()])
@@ -927,6 +970,7 @@ def RemoveOutliersHardThreshold(x_in: pd.DataFrame,
         Y.loc[index_return,:] = df_values
 
     return Y
+
 #TODO DOUBLE SIDE , LOWER, HIGHER, AVOID PHASE
 def RemoveOutliersHistoGram(x_in: pd.DataFrame,
                             df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
@@ -1090,8 +1134,6 @@ def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
     
     return Y
 
-
-
 if __name__ == "__main__":
     
     import time
@@ -1149,6 +1191,7 @@ if __name__ == "__main__":
     time_stopper.append(['time_init',time.perf_counter()])
     output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #output.plot()
+    
     time_stopper.append(['DataSynchronization',time.perf_counter()])
     output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
     time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])
@@ -1158,24 +1201,17 @@ if __name__ == "__main__":
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
-    #output.plot()       
+    #output.plot()    
+    
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
-
-    
-    
-    #for i in time_stopper.shape[0]:
-        
-    
-    
-    
-    
     output = PhaseProportonInput(output,threshold_accept = 0.75,remove_from_process=['IN'])
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     #output.plot()
     
+      
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
     #TESTED - OK #output = RemoveOutliersQuantile(dummy,col_names = [],drop=False)

@@ -5,7 +5,7 @@ Created on Mon Apr 18 06:45:44 2022
 
 Part1
 
-1) Proporção entre fases
+
 2) raise
 3) assert
 4) LOGGGER
@@ -347,7 +347,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
 
     """
     
-    x_in = output.copy(deep=True)
+    #x_in = output.copy(deep=True)
     
     time_stopper = []
     time_stopper.append(['Init',time.perf_counter()])
@@ -727,6 +727,58 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     
     time_stopper.append(['Year',time.perf_counter()])
 
+    #-------------------------#
+    #     ALL TIME SERIES     #
+    #-------------------------#
+        
+    X_mean = X.copy(deep=True)
+  
+    
+    for col in X_mean.columns.values:
+        X_mean[col] = X_mean[col].mean()
+
+    #Make all the possible permutations between columns    
+    comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
+    
+    
+    #make columns names
+    comb_vet_str = []
+    for comb in comb_vet:
+        comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
+    
+    #Create relation vector
+    df_relation = pd.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
+    
+    corr_vet =[]
+    for i in range(0,len(comb_vet)):        
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
+        
+        corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
+    
+    corr_vet = pd.DataFrame(corr_vet,columns=['comb','corr'])
+    corr_vet.set_index('comb',drop=True,inplace=True)
+    corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
+    
+    df_relation.replace([np.inf, -np.inf], np.nan,inplace=True)
+    
+    
+    for i in range(0,len(comb_vet)):        
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
+
+
+    for i in range(0,len(comb_vet)):        
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
+    
+    time_stopper.append(['AllTimeSeries',time.perf_counter()])
+
+
     #return the keep out columns
     if(len(remove_from_process)>0):           
         Y = pd.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
@@ -920,7 +972,7 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     
     return Y
 
-def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame) -> pd.DataFrame:
+def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame,remove_from_process: list = []) -> pd.DataFrame:
     """
     Marks as nan all specified timestamps
 
@@ -929,7 +981,7 @@ def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame) -> pd.DataFrame:
     Y = x_in.copy(deep=True)    
      
     for index,row in df_remove.iterrows():
-        Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),:] = np.nan        
+        Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),Y.columns.difference(remove_from_process)] = np.nan        
         
     return Y
 
@@ -1134,6 +1186,14 @@ def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
     
     return Y
 
+def CountMissingData(x_in: pd.DataFrame, remove_from_process: list = [],show=False) -> float:
+    
+    Y = x_in.loc[:,x_in.columns.difference(remove_from_process)].isnull().sum().sum()   
+    if(show):
+        print(f"Total number of missing samples {Y}")
+   
+    return Y
+
 if __name__ == "__main__":
     
     import time
@@ -1153,10 +1213,10 @@ if __name__ == "__main__":
         
     dummy = pd.DataFrame(dummy,columns=['timestamp'])
     
-    dummy['IA'] = dummy['timestamp'].dt.day
-    dummy['IB'] = dummy['timestamp'].dt.day*2
-    dummy['IV'] = dummy['timestamp'].dt.day*3
-    dummy['IN'] = dummy['timestamp'].dt.day*4
+    dummy['IA'] = 100
+    dummy['IB'] = 200
+    dummy['IV'] = 300
+    dummy['IN'] = 50
     
     #dummy['VA'] = 1
     #dummy['VB'] = 2
@@ -1180,38 +1240,48 @@ if __name__ == "__main__":
     dummy = dummy.drop(columns=['timestamp_aux'])
     dummy.set_index('timestamp', inplace=True)
     
+    '''
     #TESTE MANOBRAS
     dummy_manobra = pd.read_csv('BancoManobras.csv',names=['EQ','ALIM1', 'ALIM2', 'data_inicio',"data_final"],skiprows=1,parse_dates=True)
     dummy_manobra = dummy_manobra.iloc[:,-2:]
     
     dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
-   
+    '''
    
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
     output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #output.plot()
     
-    time_stopper.append(['DataSynchronization',time.perf_counter()])
+    
+    CountMissingData(output,show=True)    
+    time_stopper.append(['DataSynchronization',time.perf_counter()])    
     output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
+    CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])
     output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4)   
+    CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
     output = RemoveOutliersQuantile(output,drop=False)    
+    CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
+    CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
-    #output.plot()    
     
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
-    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')
+    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
-    output = PhaseProportonInput(output,threshold_accept = 0.75,remove_from_process=['IN'])
-    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    
     #output.plot()
     
-      
+    output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
+    CountMissingData(output,show=True)
+    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    
+    #output.plot()
+    
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
     #TESTED - OK #output = RemoveOutliersQuantile(dummy,col_names = [],drop=False)
@@ -1222,6 +1292,8 @@ if __name__ == "__main__":
     #TESTED - OK #output = ReturnOnlyValidDays(dummy,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm')
     #TESTED - OK #output = GetDayMaxMin(dummy,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max')
     #TESTED - OK #output = RemovePeriod(dummy,dummy_manobra)
+    #TESTED - OK #output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
+    
     
     
     #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)

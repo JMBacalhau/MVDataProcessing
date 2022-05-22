@@ -5,12 +5,7 @@ Created on Mon Apr 18 06:45:44 2022
 
 Part1
 
-
-2) raise
-3) assert
-4) LOGGGER
-5) Verificar se todos os d_avoid_ estao implementados
-6) Raise exception and erros
+7) Comment, clean and finish some functions
 
 
 Part2
@@ -75,7 +70,6 @@ import pandas as pd
 import datetime as dt
 import numpy as np
 from datetime import datetime
-from itertools import combinations
 from itertools import permutations
 
 #pd.set_option('display.max_rows', None)
@@ -155,6 +149,15 @@ def DataSynchronization(x_in: pd.DataFrame,
     
 
     """
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    if not(isinstance(start_date_dt, datetime)):  raise Exception("Date not in datetime format.")
+    if not(isinstance(end_date_dt, datetime)):  raise Exception("Date not in datetime format.")
+    
+    #-------------------#
     
     added_dic = {'s':'ms','m':'s','h':'m','D':'h','M':'D','Y':'M'}
     floor_dic = {'s':'S','m':'T','h':'H','D':'D','M':'M','Y':'Y'}    
@@ -340,12 +343,20 @@ def YearPeriodMapperVet(month: pd.Series) -> pd.Series:
     
     return month
 
-#TODO TEST
 def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     """
 
 
     """
+    
+    
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    
+    #-------------------#
     
     #x_in = output.copy(deep=True)
     
@@ -801,6 +812,14 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
 
     """
     
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    
+    #-------------------#
+    
     X = x_in.copy(deep=True)
     
     qty_sample_dic = {'s':24*60*60,'m':24*60,'h':24}
@@ -1106,8 +1125,7 @@ def RemoveOutliersMMADMM(x_in: pd.DataFrame,
         
     Y = x_in.copy(deep=True)  
           
-    # ------------------------ OUTLIERS ------------------------        
-    print("Processado outliers...")
+    # ------------------------ OUTLIERS ------------------------            
 
     X_mark_outlier = x_in.copy(deep=True)
     X_mark_outlier.loc[:,:] = False    
@@ -1198,7 +1216,36 @@ if __name__ == "__main__":
     
     import time
     import random
-    print("Example:")    
+    import logging
+    import logging.handlers
+    
+    
+    #-------------------------------------#
+    #       INITIAL CONFIGURATION         #
+    #-------------------------------------#
+    
+    
+    
+    #------------LOGGER------------#
+    
+    logger = logging.getLogger(__name__)    
+    logger.setLevel(logging.DEBUG)
+    
+    file_handler = logging.FileHandler('log.log')
+    file_handler.setLevel(logging.DEBUG)
+    
+    cmd_handler = logging.StreamHandler()
+    cmd_handler.setLevel(logging.INFO)
+    
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    cmd_handler.setFormatter(logging.Formatter('%(message)s'))
+    
+    logger.handlers = []
+    
+    logger.addHandler(file_handler)
+    logger.addHandler(cmd_handler)
+    logger.info("Example:")
+  
     
     
     data_inicio='2021-01-01'
@@ -1280,6 +1327,11 @@ if __name__ == "__main__":
     CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     
+    raise Warning("TESTE")
+    raise TypeError("Only integers are allowed")
+    raise Exception("Sorry, no numbers below zero")
+    
+    
     #output.plot()
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
@@ -1310,6 +1362,75 @@ if __name__ == "__main__":
     TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
 
 
+'''
+
+BaseException
+ +-- SystemExit
+ +-- KeyboardInterrupt
+ +-- GeneratorExit
+ +-- Exception
+      +-- StopIteration
+      +-- StopAsyncIteration
+      +-- ArithmeticError
+      |    +-- FloatingPointError
+      |    +-- OverflowError
+      |    +-- ZeroDivisionError
+      +-- AssertionError
+      +-- AttributeError
+      +-- BufferError
+      +-- EOFError
+      +-- ImportError
+      |    +-- ModuleNotFoundError
+      +-- LookupError
+      |    +-- IndexError
+      |    +-- KeyError
+      +-- MemoryError
+      +-- NameError
+      |    +-- UnboundLocalError
+      +-- OSError
+      |    +-- BlockingIOError
+      |    +-- ChildProcessError
+      |    +-- ConnectionError
+      |    |    +-- BrokenPipeError
+      |    |    +-- ConnectionAbortedError
+      |    |    +-- ConnectionRefusedError
+      |    |    +-- ConnectionResetError
+      |    +-- FileExistsError
+      |    +-- FileNotFoundError
+      |    +-- InterruptedError
+      |    +-- IsADirectoryError
+      |    +-- NotADirectoryError
+      |    +-- PermissionError
+      |    +-- ProcessLookupError
+      |    +-- TimeoutError
+      +-- ReferenceError
+      +-- RuntimeError
+      |    +-- NotImplementedError
+      |    +-- RecursionError
+      +-- SyntaxError
+      |    +-- IndentationError
+      |         +-- TabError
+      +-- SystemError
+      +-- TypeError
+      +-- ValueError
+      |    +-- UnicodeError
+      |         +-- UnicodeDecodeError
+      |         +-- UnicodeEncodeError
+      |         +-- UnicodeTranslateError
+      +-- Warning
+           +-- DeprecationWarning
+           +-- PendingDeprecationWarning
+           +-- RuntimeWarning
+           +-- SyntaxWarning
+           +-- UserWarning
+           +-- FutureWarning
+           +-- ImportWarning
+           +-- UnicodeWarning
+           +-- BytesWarning
+           +-- EncodingWarning
+           +-- ResourceWarning
+           
+'''
 
             
     

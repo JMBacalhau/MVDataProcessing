@@ -1327,10 +1327,7 @@ if __name__ == "__main__":
     CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     
-    raise Warning("TESTE")
-    raise TypeError("Only integers are allowed")
-    raise Exception("Sorry, no numbers below zero")
-    
+   
     
     #output.plot()
     

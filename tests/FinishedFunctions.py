@@ -392,7 +392,9 @@ def YearPeriodMapperVet(month: pandas.Series) -> pandas.Series:
     
     return season
 
-def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,threshold_accept: float = 0.75,remove_from_process = []):
+def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
+                        threshold_accept: float = 0.75,
+                        remove_from_process = []) -> pandas.DataFrame:
     """
     Makes the imputation of missing data samples based on the ration between columns. (time series)
     
@@ -424,7 +426,7 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,threshold_accept: floa
     quantity time series.    
     :type x_in: pandas.core.frame.DataFrame
     
-    :param threshold_accept: The sample frequency of the time series. Defaults to 0.75 (75%).  
+    :param threshold_accept: The minimum amount of samples to accept. Defaults to 0.75 (75%).  
     :type threshold_accept: float,optional
     
     :param remove_from_process: Columns to be kept off the process;  

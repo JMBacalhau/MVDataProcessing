@@ -48,10 +48,36 @@ import FinishedFunctions as f_remove
 def ReturnOnlyValidDays(x_in: pd.DataFrame,
                         sample_freq: int = 5,
                         threshold_accept: float = 1.0,
-                        sample_time_base: str = 'm') -> pd.DataFrame:
+                        sample_time_base: str = 'm',
+                        remove_from_process = []) -> pd.DataFrame:
     """
     Returns all valid days. A valid day is one with no missing values for any 
     of the timeseries on each column.
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+    :type sample_freq: int,optional
+    
+    :param threshold_accept: The amount of samples that is required to consider a valid day. Defaults to 1 (100%).  
+    :type threshold_accept: float,optional
+    
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (h)ours, (m)inutes, or (s)econds. Defaults to (m)inutes.  
+    :type sample_time_base: srt,optional
+    
+    :param remove_from_process: Columns to be kept off the process;  
+    :type remove_from_process: list,optional
+    
+         
+    :raises Exception: if x_in has no DatetimeIndex. 
+    :raises Exception: if sample_time_base is is not in seconds, minutes or hours.
+    
+    
+    :return: Y: The pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
+    :rtype: Y: pandas.core.frame.DataFrame
 
     """
     
@@ -59,38 +85,39 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
     # BASIC INPUT CHECK #
     #-------------------#
     
-    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")    
+    if sample_time_base not in ['s','m','h']:  raise Exception("The sample_time_base is not in seconds, minutes or hours.")
     
     #-------------------#
     
     X = x_in.copy(deep=True)
     
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)
+    
+    
     qty_sample_dic = {'s':24*60*60,'m':24*60,'h':24}
     
-    if sample_time_base in ['s','m','h']: 
-        
-        df_count = X.groupby([X.index.year,X.index.month,X.index.day]).count()/(qty_sample_dic[sample_time_base]/sample_freq)    
-        time_vet_stamp = X.index[np.arange(0,len(X.index),int(24*60/sample_freq))]     
-        df_count = df_count.reset_index(drop=True)    
-        df_count.insert(0,'timestamp_day', time_vet_stamp)
-        df_count.set_index('timestamp_day', inplace=True)    
-        df_count = df_count>=threshold_accept    
-        
-        df_count = df_count.sum(axis=1) == df_count.shape[1]
-        df_count.name = 'isValid'
-        df_count = df_count.reset_index()
-        X['timestamp_day'] = X.index.floor("D").values
-        
-        keep_X_index = X.index
-        X = pd.merge(X, df_count,on = 'timestamp_day' ,how ='left')
-        X.index = keep_X_index
-        X = X.loc[X['isValid'] == True,:]
-        
-        X.drop(columns=['isValid','timestamp_day'],inplace=True)
-    else:
-        X = pd.DafaFrame([])
-        df_count = pd.DafaFrame([])
-        
+
+    df_count = X.groupby([X.index.year,X.index.month,X.index.day]).count()/(qty_sample_dic[sample_time_base]/sample_freq)    
+    time_vet_stamp = X.index[np.arange(0,len(X.index),int(24*60/sample_freq))]     
+    df_count = df_count.reset_index(drop=True)    
+    df_count.insert(0,'timestamp_day', time_vet_stamp)
+    df_count.set_index('timestamp_day', inplace=True)    
+    df_count = df_count>=threshold_accept    
+    
+    df_count = df_count.sum(axis=1) == df_count.shape[1]
+    df_count.name = 'isValid'
+    df_count = df_count.reset_index()
+    X['timestamp_day'] = X.index.floor("D").values
+    
+    keep_X_index = X.index
+    X = pd.merge(X, df_count,on = 'timestamp_day' ,how ='left')
+    X.index = keep_X_index
+    X = X.loc[X['isValid'] == True,:]
+    
+    X.drop(columns=['isValid','timestamp_day'],inplace=True)
+
         
     return X,df_count
 
@@ -194,6 +221,15 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
         
     return Y
    
+    
+   
+
+#TODO FROM HERE
+
+
+
+
+
 #TODO     
 def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
     """
@@ -570,7 +606,10 @@ if __name__ == "__main__":
     CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     
+    
+    
    
+    
     
     #output.plot()
     

@@ -46,13 +46,14 @@ import FinishedFunctions as f_remove
 
 
 
-def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
+def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,threshold_accept: float = 0.75,remove_from_process = []):
     """
     Makes the imputation of missing data samples based on the ration between columns. (time series)
     
     Theory background.:
-    Correlation between phases (φa,φb, φv) of the same quantity (V, I or pf) to infer a missing sample value based on adjacent
-    samples. Adjacent samples are those of the same timestamp i but from different phases    that the one which is missing.
+        
+    Correlation between phases (φa,φb, φv) of the same quantity (V, I or pf) is used to infer a missing sample value based on adjacent
+    samples. Adjacent samples are those of the same timestamp i but from different phases that the one which is missing.
     The main idea is to use a period where all three-phases (φa, φb, φv) exist and calculate the proportion between them. 
     Having the relationship between phases, if one or two are missing in a given timestamp i it is possible to use the 
     remaining phase and the previous calculated ratio to fill the missing ones. The number of samples used to calculate the 
@@ -62,20 +63,29 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     are considered: hour, period of the day (dawn, morning, afternoon and night), day, month, season (humid/dry), and year.
     
     
-    The correlation between the feeder energy demand and the period of the day or the
-    31season is very high. The increase in consumption in the morning and afternoon in industrial areas is expected as those are the periods where most factories are fully functioning.
-    In residential areas, the consumption is expected to be higher in the evening; however,
-    it is lower during the day’s early hours. Furthermore, in the summer, a portion of the
-    network (vacation destination) can be in higher demand. Nonetheless, in another period
-    of the year (winter), the same area could have a lower energy demand. Therefore, if there
-    is not enough information on that particular day to compute the ratio between phases, a
-    good alternative is to use data from the month. Finally, given the amount of missing data
-    for a particular feeder, the only option could be the use of the whole year to calculate the
-    ratio between phases.
-    Regarding the minimum amount of data that a period should have to be valid it
-    is assumed 50% for all three-phases (φa, φb, φv). The 50% limit of missing data for the
-    period T is set to guaranty that there is more than half (majority) of valid samples, hence,
-    it has enough data to estimate the ratio between phases with less probability of error
+    The correlation between the feeder energy demand and the period of the day or the season is very high. The increase in consumption in the
+    morning and afternoon in industrial areas is expected as those are 
+    the periods where most factories are fully functioning. In residential areas, the consumption is expected to be higher in the evening; however,
+    it is lower during the day’s early hours. Furthermore, in the summer, a portion of the network (vacation destination) can be in higher demand. 
+    Nonetheless, in another period of the year (winter), the same area could have a lower energy demand. Therefore, if there is not enough 
+    information on that particular day to compute the ratio between phases, a good alternative is to use data from the month. Finally, 
+    given the amount of missing data for a particular feeder, the only option could be the use of the whole year to calculate the
+    ratio between phases. Regarding the minimum amount of data that a period should have to be valid it
+    is assumed the default of 50% for all phases.
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param threshold_accept: The sample frequency of the time series. Defaults to 5.  
+    :type threshold_accept: float,optional
+    
+    :param remove_from_process: The sample frequency of the time series. Defaults to 5.  
+    :type remove_from_process: list
+    
+    :return: Y: The pandas.core.frame.DataFrame integrated by hour.
+    :rtype: Y: pandas.core.frame.DataFrame
 
     """
     

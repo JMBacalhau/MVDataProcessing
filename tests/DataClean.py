@@ -28,49 +28,16 @@ Part5
 1) Test on 2021 dataset
 
 
-
-
-
-Example Google style docstrings.
-
-This module demonstrates documentation as specified by the `Google
-Python Style Guide`_. Docstrings may extend over multiple lines.
-Sections are created with a section header and a colon followed by a
-block of indented text.
-
-Example:
-    Examples can be given using either the ``Example`` or ``Examples``
-    sections. Sections support any reStructuredText formatting, including
-    literal blocks::
-
-        $ python example_google.py
-
-Section breaks are created by resuming unindented text. Section breaks
-are also implicitly created anytime a new section starts. 
-
-Attributes:
-    module_level_variable1 (int): Module level variables may be documented in
-        either the ``Attributes`` section of the module docstring, or in an
-        inline docstring immediately following the variable.
-
-        Either form is acceptable, but the two should not be mixed. Choose
-        one convention to document module level variables and be consistent
-        with it.
-
-Todo:
-    * For module TODOs
-    * You have to also use ``sphinx.ext.todo`` extension
-
-.. _Google Python Style Guide:   
-http://google.github.io/styleguide/pyguide.html
-
 """
 
 import pandas as pd
+import pandas
 import datetime as dt
 import numpy as np
+import numpy
 from datetime import datetime
 from itertools import permutations
+import FinishedFunctions as f_remove
 
 #pd.set_option('display.max_rows', None)
 #pd.set_option('display.max_columns', None)
@@ -78,274 +45,37 @@ from itertools import permutations
 #pd.set_option('display.max_colwidth', None)
 
 
-def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_for: int = 0):
-    """
-    Simple code profiler.
-    
-    How to use:
-    Create a list ->  time_stopper = []    
-    
-    Put a -> time_stopper.append(['time_init',time.perf_counter()]) at the beginning.
-    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the fist parameter beeing a name and
-    the second beeing the time.
-    Call this function at the end.
-    
-    Example.
-    
-    time_stopper.append(['time_init',time.perf_counter()])
-    
-    func1()
-    time_stopper.append(['func1',time.perf_counter()])
-    func2()
-    time_stopper.append(['func2',time.perf_counter()])
-    func3()
-    time_stopper.append(['func3',time.perf_counter()])
-    func4()
-    time_stopper.append(['func4',time.perf_counter()])
-     
-    TimeProfile(time_stopper,'My Profiler',show=True,estimate_for=500)
-    
-    The estimate_for parameter makes the calculation as if you would run x times the code analyzed;
-    """
-    
-    
-    if(show):
-        print("Profile: " + name)
-        time_stopper = pd.DataFrame(time_stopper,columns=['Type','time'])    
-        #time_stopper['time'] = time_stopper['time']-time_stopper['time'].min()    
-        time_stopper['Delta'] = time_stopper['time'] - time_stopper['time'].shift(periods=1, fill_value=0)    
-        time_stopper = time_stopper.iloc[1:,:]
-        time_stopper['%'] =  np.round(100*time_stopper['Delta']/time_stopper['Delta'].sum(),2)
-        total_estimate = time_stopper['Delta'].sum()
-        time_stopper = time_stopper.append(pd.DataFrame([['Total',np.nan,time_stopper['Delta'].sum(),100]],columns=['Type','time','Delta','%']))    
-        print(time_stopper)
-        if(estimate_for!=0):
-            print(f"Estimation for {estimate_for} runs: {np.round(total_estimate*estimate_for/(60*60),2)} hours.")
-
-    return
-
-#BUG Some sample_freq have trouble lol.
-def DataSynchronization(x_in: pd.DataFrame,
-              start_date_dt: datetime,
-              end_date_dt: datetime,
-              sample_freq: int = 5,
-              sample_time_base: str = 'm') -> pd.DataFrame:        
-    """
-    The time series synchronization is the first step in processing the dataset. The synchronization is vital 
-    since the alignment between phases (φa, φb, φv) of the same quantity, between quantities (V, I, pf) of the
-    same feeder, and between feeders, provides many advantages. The first one being the ability to combine all
-    nine time series, the three-phase voltage, current, and power factor of each feeder to calculate the secondary
-    quantities (Pactive/Preactive, Eactive/Ereactive).
-    
-    Furthermore, the synchronization between feeders provides the capability to analyze the iteration between them,
-    for instance, in load transfers for scheduled maintenance and to estimate substation’s transformers quantities
-    by the sum of all feeders.
-     
-    
-    Most of the fuctions in this module assumes that the time series are "Clean" to a certain sample_freq. Therefore,
-    this fuction must be executed first on the dataset.
-    
-    sample_time_base: [np.timedelta64]: (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
-    
-
-    """
-    #-------------------#
-    # BASIC INPUT CHECK #
-    #-------------------#
-    
-    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
-    if not(isinstance(start_date_dt, datetime)):  raise Exception("Date not in datetime format.")
-    if not(isinstance(end_date_dt, datetime)):  raise Exception("Date not in datetime format.")
-    
-    #-------------------#
-    
-    added_dic = {'s':'ms','m':'s','h':'m','D':'h','M':'D','Y':'M'}
-    floor_dic = {'s':'S','m':'T','h':'H','D':'D','M':'M','Y':'Y'}    
-        
-    x_in.index = x_in.index.tz_localize(None) #Makes the datetimeIndex naive (no time zone)
-    
-    #----------------------------------------------------------------#
-    #Creates a base vector that conntainXs all the samples between data_inicio and data_final filled timestamp and with nan
-    
-    qty_data = len(x_in.columns)
-               
-    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')
-    timearray = timearray + np.timedelta64(1,added_dic[sample_time_base]) # ADD a second/Minute/Hour/Day/Month to the end so during the sort this samples will be at last (HH:MM:01)
-    
-    vet_amostras = pd.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
-    vet_amostras.index.name = 'timestamp'
-    
-        
-    #----------------------------------------------------------------#
-    #Creates the output dataframe which is the same but witohut the added second.
-       
-    Y = vet_amostras.copy(deep=True)    
-    Y.index = Y.index.floor(floor_dic[sample_time_base])#Flush the seconds    
-    
-    #----------------------------------------------------------------#
-    #Saves the name of the columns
-    save_columns_name = x_in.columns.values    
-    
-    #----------------------------------------------------------------#
-    #Start to process each column
-    
-    fase_list = np.arange(0,x_in.shape[1])   
-    
-    for fase in fase_list:                
-        
-        X = x_in.copy(deep=True)
-        X.columns = Y.columns
-        X = X.loc[~X.iloc[:,fase].isnull(),fase]#Gets only samples on the phase of interest                
-        X = X[np.logical_and(X.index<end_date_dt,X.index>=start_date_dt)]#Get samples on between the start and end of the period of study
-        
-        if(X.shape[0]!=0):            
-            
-            #Process samples that are multiple of sample_freq
-            df_X = X.copy(deep=True)
-            df_vet_amostras = vet_amostras[fase] 
-                        
-            #remove seconds (00:00:00) to put this specific samples at the beginning during sort
-            df_X = df_X.sort_index(ascending=True)#Ensures the sequence of timestamps
-            df_X.index = df_X.index.round('1'+floor_dic[sample_time_base])#Remove seconds, rounding to the nearest minute
-            df_X = df_X[df_X.index.minute % sample_freq == 0]#Samples that are multiple of sample_freq have preference 
-            
-            if(df_X.empty != True):
-                              
-                df_X = df_X[~df_X.index.duplicated(keep='first')]#Remove unecessary duplicates     
-               
-                #joins both vectors
-                df_aux = pd.concat([df_X, df_vet_amostras])
-                df_aux = df_aux.sort_index(ascending=True)#Ensures the sequence of timestamps    
-                
-                #Elimina segundos (00:00:00), e elimina duplicatas deixando o X quando existente e vet_amostras quando não existe a amostra
-                df_aux.index = df_aux.index.floor(floor_dic[sample_time_base])
-                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]#Remove unecessary duplicates     
-                
-                #Make sure that any round up that ended up out of the period of study is removed
-                df_aux = df_aux[np.logical_and(df_aux.index<end_date_dt,df_aux.index>=start_date_dt)]
-                
-                Y.loc[:,fase] = df_aux
-                
-                
-                
-            #Process samples that are NOT multiple of sample_freq
-            df_X = X.copy(deep=True)
-            df_vet_amostras = vet_amostras[fase]                               
-                            
-            #remove seconds (00:00:00) to put this specific samples at the beginning during sort
-            df_X = df_X.sort_index(ascending=True)#Ensures the sequence of timestamps
-            df_X.index = df_X.index.round('1'+floor_dic[sample_time_base])#Remove seconds, rounding to the nearest minute
-            df_X = df_X[df_X.index.minute % sample_freq != 0]#Samples that are NOT multiple of sample_freq have preference 
-                            
-            
-            if(df_X.empty != True):
-               
-                                               
-                df_X.index = df_X.index.round(str(sample_freq)+floor_dic[sample_time_base])#Aproximate sample to the closest multiple of sample_freq
-                
-                df_X = df_X[~df_X.index.duplicated(keep='first')]#Remove unecessary duplicates     
-               
-                #joins both vectors
-                df_aux = pd.concat([df_X, df_vet_amostras])
-                df_aux = df_aux.sort_index(ascending=True)#Ensures the sequence of timestamps                
-                
-                #Remove seconds (00:00:00), and remove ducplicates leaving X when there is data and vet amostra when its empty
-                df_aux.index = df_aux.index.floor(floor_dic[sample_time_base])
-                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]#Remove unecessary duplicates     
-                
-                
-                #Make sure that any round up that ended up out of the period of study is removed
-                df_aux = df_aux[np.logical_and(df_aux.index<end_date_dt,df_aux.index>=start_date_dt)]
-                                                
-                #Copy data to the output vecto olny if there not data there yet.
-                Y.loc[Y.iloc[:,fase].isnull(),fase] = df_aux.loc[Y.iloc[:,fase].isnull()]
-    
-    
-    #----------------------------------------------------------------#
-    #Last operations before retun Y
-    
-    Y = Y.astype(float)    
-    Y.columns = save_columns_name# Gives back the original name of the columns in X
-    
-    return Y
-
-#TODO not yet tested with other time samples
-def IntegrateHour(x_in: pd.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pd.DataFrame:
-    """
-
-    :param Y: param sample_freq:  (Default value = 5)
-    :param sample_freq:  (Default value = 5)
-
-    """
-    hour_divider = {'s':60*60,'m':60}
-
-    
-    Y = x_in.copy(deep=True)
-    
-    time_vet_stamp = Y.index[np.arange(0,len(Y.index),int(hour_divider[sample_time_base]/sample_freq))]    
-    Y = Y.groupby([Y.index.year,Y.index.month,Y.index.day,Y.index.hour]).mean() 
-    Y = Y.reset_index(drop=True)
-    Y.insert(0,'timestamp', time_vet_stamp)
-    Y.set_index('timestamp', inplace=True)
-    
-    return Y
-
-def Correlation(X: pd.DataFrame) -> float:
-    """
-    Calculates the correlation between each column of the DataFrame and outputs the average of all.    
-
-    """
-    
-    corr_value = X.corr()[X.corr()!=1].mean().mean()
-    
-    return corr_value
-    
-def DayPeriodMapper(hour: int) -> int:
-    """
-    Maps a given hour to one of four periods of a day.
-    
-    """
-    return (
-        0 if 0 <= hour < 6
-        else
-        1 if 6 <= hour < 12
-        else
-        2 if 12 <= hour < 18
-        else
-        3
-    )
-
-def DayPeriodMapperVet(hour: pd.Series) -> pd.Series:
-    """
-    Maps a given hour to one of four periods of a day.
-    
-    """
-    
-    map_dict = {0:0,1:0,2:0,3:0,4:0,5:0,
-                6:1,7:1,8:1,9:1,10:1,11:1,
-                12:2,13:2,14:2,15:2,16:2,17:2,
-                18:3,19:3,20:3,21:3,22:3,23:3}
-    
-    hour = hour.map(map_dict)
-    
-    return hour
-
-def YearPeriodMapperVet(month: pd.Series) -> pd.Series:
-    """
-    Maps a given hour to one of four periods of a day.
-    
-    """
-    
-    map_dict = {10:0,11:0,12:0,1:0,2:0,3:0,
-                4:0,5:0,6:0,7:0,7:0,9:0}
-    
-    month = month.map(map_dict)
-    
-    return month
 
 def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     """
-
+    Makes the imputation of missing data samples based on the ration between columns. (time series)
+    
+    Theory background.:
+    Correlation between phases (φa,φb, φv) of the same quantity (V, I or pf) to infer a missing sample value based on adjacent
+    samples. Adjacent samples are those of the same timestamp i but from different phases    that the one which is missing.
+    The main idea is to use a period where all three-phases (φa, φb, φv) exist and calculate the proportion between them. 
+    Having the relationship between phases, if one or two are missing in a given timestamp i it is possible to use the 
+    remaining phase and the previous calculated ratio to fill the missing ones. The number of samples used to calculate the 
+    ratio around the missing sample is an important parameter. For instance if a sample is missing in the afternoon it is best to
+    use samples from that same day and afternoon to calculate the ratio and fill the missing sample. Unfortunately, there might be not 
+    enough samples in that period to calculate the ratio.Therefore, in this step, different periods T of analysis around the missing sample
+    are considered: hour, period of the day (dawn, morning, afternoon and night), day, month, season (humid/dry), and year.
+    
+    
+    The correlation between the feeder energy demand and the period of the day or the
+    31season is very high. The increase in consumption in the morning and afternoon in industrial areas is expected as those are the periods where most factories are fully functioning.
+    In residential areas, the consumption is expected to be higher in the evening; however,
+    it is lower during the day’s early hours. Furthermore, in the summer, a portion of the
+    network (vacation destination) can be in higher demand. Nonetheless, in another period
+    of the year (winter), the same area could have a lower energy demand. Therefore, if there
+    is not enough information on that particular day to compute the ratio between phases, a
+    good alternative is to use data from the month. Finally, given the amount of missing data
+    for a particular feeder, the only option could be the use of the whole year to calculate the
+    ratio between phases.
+    Regarding the minimum amount of data that a period should have to be valid it
+    is assumed 50% for all three-phases (φa, φb, φv). The 50% limit of missing data for the
+    period T is set to guaranty that there is more than half (majority) of valid samples, hence,
+    it has enough data to estimate the ratio between phases with less probability of error
 
     """
     
@@ -445,16 +175,16 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     #-------------------------#
 
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,DayPeriodMapperVet(mask_valid.index.hour)]) 
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,f_remove.DayPeriodMapperVet(mask_valid.index.hour)]) 
     count_valid = grouper_valid.transform('sum')
     
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,f_remove.DayPeriodMapperVet(mask_valid.index.hour)])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = X.groupby([X.index.year,X.index.month,X.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                     
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day,f_remove.DayPeriodMapperVet(mask_valid.index.hour)])                     
     X_mean = grouper.transform('mean')
     
     X_mean[mask_reject] = np.nan
@@ -623,16 +353,16 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     #-------------------------#
     
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])                   
+    grouper_valid = mask_valid.groupby([f_remove.YearPeriodMapperVet(mask_valid.index.month)])                   
     count_valid = grouper_valid.transform('sum')
     
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])                
+    grouper_null = mask_null.groupby([f_remove.YearPeriodMapperVet(mask_valid.index.month)])                
     count_null = grouper_null.transform('sum')
         
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
     
-    grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])                     
+    grouper = X.groupby([f_remove.YearPeriodMapperVet(mask_valid.index.month)])                     
     X_mean = grouper.transform('mean')
     
     X_mean[mask_reject] = np.nan
@@ -797,7 +527,7 @@ def PhaseProportonInput(x_in,threshold_accept = 0.75,remove_from_process = []):
     
     time_stopper.append(['Final',time.perf_counter()])
     
-    TimeProfile(time_stopper,name='Phase',show=False)
+    f_remove.TimeProfile(time_stopper,name='Phase',show=False)
 
     
     return Y
@@ -877,7 +607,7 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
     Y.insert(0,'timestamp_day', time_vet_stamp)
     Y.set_index('timestamp_day', inplace=True)    
     
-    Y = DataSynchronization(Y, start_date_dt, end_date_dt,sample_freq = 1,sample_time_base='D')
+    Y = f_remove.DataSynchronization(Y, start_date_dt, end_date_dt,sample_freq = 1,sample_time_base='D')
     
     Y = Y.interpolate(method_type='linear')    
     
@@ -970,7 +700,7 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     #ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
     
     #Organize samples
-    Y = DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
+    Y = f_remove.DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
     
     #Interpolate before proportion between phases
     if(pre_interpol!=False):
@@ -982,7 +712,7 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
              
     #Integralization 1h
     if(integrate!=False):        
-        Y = IntegrateHour(Y,sample_freq = 5)        
+        Y = f_remove.IntegrateHour(Y,sample_freq = 5)        
         
         #Interpolate after Integralization 1h
         if(interpol_integrate!=False):
@@ -1060,7 +790,7 @@ def RemoveOutliersHistoGram(x_in: pd.DataFrame,
     
     #Remove outliers ouside the avoid period 
     if(integrate_hour):
-        Y_int = IntegrateHour(Y,sample_freq)    
+        Y_int = f_remove.IntegrateHour(Y,sample_freq)    
         Y_int = Y_int.reset_index(drop=True)    
     
     for col in Y_int:
@@ -1297,7 +1027,7 @@ if __name__ == "__main__":
    
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
-    output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
+    output = f_remove.DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #output.plot()
     
     
@@ -1356,7 +1086,7 @@ if __name__ == "__main__":
     #   CODE PROFILE   #
     #------------------#
     
-    TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
+    f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
 
 
 '''

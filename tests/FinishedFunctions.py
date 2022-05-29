@@ -137,10 +137,10 @@ def DataSynchronization(x_in: pandas.core.frame.DataFrame,
     # BASIC INPUT CHECK #
     #-------------------#
     
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
-    if not(isinstance(start_date_dt, datetime)):  raise Exception("Date not in datetime format.")
-    if not(isinstance(end_date_dt, datetime)):  raise Exception("Date not in datetime format.")
-    if sample_time_base not in ['s','m','h','D','M','Y']:  raise Exception("Same base time not valid. Ex. ['s','m','h','D','M','Y'] ")
+    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
+    if not(isinstance(start_date_dt, datetime)):  raise Exception("start_date_dt Date not in datetime format.")
+    if not(isinstance(end_date_dt, datetime)):  raise Exception("end_date_dt Date not in datetime format.")
+    if sample_time_base not in ['s','m','h','D','M','Y']:  raise Exception("sample_time_base not valid. Ex. ['s','m','h','D','M','Y'] ")
     
     #-------------------#
         
@@ -283,7 +283,7 @@ def IntegrateHour(x_in: pandas.DataFrame,sample_freq: int = 5,sample_time_base: 
     # BASIC INPUT CHECK #
     #-------------------#
     
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
     
     Y = x_in.copy(deep=True)
     
@@ -342,7 +342,7 @@ def DayPeriodMapper(hour: int) -> int:
         3
     )
 
-def DayPeriodMapperVet(hour: pandas.Series) -> pandas.core.frame.Series:
+def DayPeriodMapperVet(hour: pandas.core.series.Series) -> pandas.core.series.Series:
     """
     Maps a given hour to one of four periods of a day.
     
@@ -352,12 +352,12 @@ def DayPeriodMapperVet(hour: pandas.Series) -> pandas.core.frame.Series:
     For 18 to 23 (hour) -> 3 evening
     
     
-    :param hour: A pandas.core.frame.Series with values between 0 and 23 to map each hour in the series to a period of the day. 
+    :param hour: A pandas.core.series.Series with values between 0 and 23 to map each hour in the series to a period of the day. 
     this is a "vector" format for DayPeriodMapper function.
-    :type hour: pandas.core.frame.Series
+    :type hour: pandas.core.series.Series
     
-    :return: period_day: The hour pandas.core.frame.Series mapped to periods of the day
-    :rtype: period_day: pandas.core.frame.Series
+    :return: period_day: The hour pandas.core.series.Series mapped to periods of the day
+    :rtype: period_day: pandas.core.series.Series
     
     """
     
@@ -370,7 +370,7 @@ def DayPeriodMapperVet(hour: pandas.Series) -> pandas.core.frame.Series:
     
     return period_day
 
-def YearPeriodMapperVet(month: pandas.Series) -> pandas.core.frame.Series:
+def YearPeriodMapperVet(month: pandas.core.series.Series) -> pandas.core.series.Series:
     """
     Maps a given month to one of two periods of an year, being dry and humid .
     
@@ -378,10 +378,10 @@ def YearPeriodMapperVet(month: pandas.Series) -> pandas.core.frame.Series:
     For april to september (month) -> 1 dry
     
     
-    :param month: A pandas.core.frame.Series with values between 0 and 12 to map each month in the series to dry or humid.
+    :param month: A pandas.core.series.Series with values between 0 and 12 to map each month in the series to dry or humid.
     
-    :return: season: The months pandas.core.frame.Series mapped to dry or humid.
-    :rtype: season: pandas.core.frame.Series
+    :return: season: The months pandas.core.series.Series mapped to dry or humid.
+    :rtype: season: pandas.core.series.Series
     
     """
     
@@ -394,7 +394,7 @@ def YearPeriodMapperVet(month: pandas.Series) -> pandas.core.frame.Series:
 
 def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
                         threshold_accept: float = 0.75,
-                        remove_from_process = []) -> pandas.core.frame.DataFrame:
+                        remove_from_process: list = []) -> pandas.core.frame.DataFrame:
     """
     Makes the imputation of missing data samples based on the ration between columns. (time series)
     
@@ -445,7 +445,7 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
     # BASIC INPUT CHECK #
     #-------------------#
     
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")
+    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
     
     #-------------------#
     
@@ -951,17 +951,305 @@ def CalcUnbalance(x_in: pandas.core.frame.DataFrame,remove_from_process: list = 
     
     return Y
 
+def SavePeriod(x_in: pandas.core.frame.DataFrame,
+               df_save: pandas.core.frame.DataFrame) -> tuple:    
+    """    
+    For a given set of periods (Start->End) returns the data. It also return the idexes.
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param df_save: The fisrt column with the start and the sencond column with the end date.
+    :type df_save: pandas.core.frame.DataFrame
 
+    :return: Y,mark_index_not: The input pandas.core.frame.DataFrame sliced by the df_save periods. it also returns the idexes
+    :rtype: Y,mark_index_not: tuple
 
+    """
+    
+    Y = x_in.copy(deep=True)
+    mark_index_not = x_in.index    
+    
+    for index,row in df_save.iterrows():
+        Y = Y.loc[numpy.logical_and(Y.index>=row[0],Y.index<=row[1]),:]
+        mark_index_not = mark_index_not[numpy.logical_and(mark_index_not>=row[0],mark_index_not<=row[1])]    
+    
+    return Y,mark_index_not
 
+def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
+                         df_avoid_periods: pandas.core.frame.DataFrame = pandas.DataFrame([]),
+                         len_mov_avg: int = 4*12,
+                         std_def: float = 2,
+                         min_var_def: float = 0.5,
+                         allow_negatives: bool = False,
+                         plot: bool =False,
+                         remove_from_process: list = [],
+                         ) -> pandas.core.frame.DataFrame:
+    """
+    Removes outliers from the timeseries on each column using the (M)oving (M)edian (A)bslute 
+    (D)eviation around the (M)oving (M)edian. 
+    
+    A statistical method is used for removing the remaining outliers. In LEYS et al. (2019), the authors state that it is 
+    common practice the use of plus and minus the standard deviation (±σ) around the mean (µ), however, this measurement is particularly
+    sensitive to outliers. Furthermore, the authors propose the use of the absolute deviation around the median. 
+    Therefore, in this work the limit was set by the median absolute deviation (MADj) around the moving median (Mj) where j denotes the number of samples
+    of the moving window. Typically, an MV feeder has a seasonality where in the summer load is higher than in the winter or vice-versa.
+    Hence, it is vital to use the moving median instead of the median of all the time series.
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
+    :type df_avoid_periods: pandas.core.frame.DataFrame
+    
+    :param len_mov_avg: Size of the windows of the moving average.
+    :type len_mov_avg: int,optional
+    
+    :param std_def: Absolute standard deviation to be computed around the moving average.
+    :type std_def: float,optional
+    
+    :param min_var_def: For low variance data this parameter will set a minimum distance from the upper and lower boundaries.
+    :type min_var_def: float,optional
+     
+    :param allow_negatives: Alow for the lower level to be below zero.
+    :type allow_negatives: bool,optional
+    
+    :param plot: A plot of the boundaries and result to debug parameters.
+    :type plot: bool,optional
+    
+    :param remove_from_process: Columns to be kept off the process.
+    :type remove_from_process: list,optional
+    
+    :raises Exception: if x_in has no DatetimeIndex. 
+    
+    :return: Y: A pandas.core.frame.DataFrame without the outliers
+    :rtype: Y: pandas.core.frame.DataFrame
 
+    """
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
+  
+    
+        
+    X = x_in.copy(deep=True)   
 
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)
+    
+    
+    Y = X.copy(deep=True)  
+          
+    # ------------------------ OUTLIERS ------------------------            
 
+    X_mark_outlier = X.copy(deep=True)
+    X_mark_outlier.loc[:,:] = False    
+    
+    #---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL   
+    X_mad = X.copy(deep=True)
+    X_moving_median = X.copy(deep=True)
+    X_moving_up = X.copy(deep=True)
+    X_moving_down = X.copy(deep=True)
+      
+    # DESVIO PADRÂO ABSOLUTO ENTORNO DA MEDIANA MOVEL
+                       
+    #------------ Computa Mediana Móvel ------------#                                      
+    X_moving_median = X_moving_median.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))
+           
+    X_moving_median.iloc[-2*len_mov_avg:,:] = X_moving_median.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
+    X_moving_median.iloc[:2*len_mov_avg,:] = X_moving_median.iloc[:2*len_mov_avg,:].fillna(method='bfill')
+    
+    #------------ Computa MAD Móvel ------------#       
+    X_mad = X-X_moving_median       
+    X_mad = X_mad.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))       
+    X_mad.iloc[-2*len_mov_avg:,:] = X_mad.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
+    X_mad.iloc[:2*len_mov_avg,:] = X_mad.iloc[:2*len_mov_avg,:].fillna(method='bfill')
+           
+    #------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#       
+    X_mad[X_mad<=min_var_def]= min_var_def
+    
+    #------------ MAD Móvel Limites ------------#       
+    X_moving_up = X_moving_median+std_def*X_mad
+    X_moving_down = X_moving_median-std_def*X_mad
+    
+    #------------ Allow the lower limit to go negative. Only valid for kVar or bi-directional current/Power. ------------#
+    if(~allow_negatives):
+        X_moving_down[X_moving_down<=0] = 0
+               
+    #------------ Marcando outliers ------------#
+    X_mark = (X>=X_moving_up) | (X<=X_moving_down)
+    
+    #------------ Não marca os intervalos onde não foi possível determinar ------------#   
+    X_mark[ X_moving_up.isnull() | X_moving_down.isnull() ] = False              
+    X_mark.iloc[:int(len_mov_avg/2),:] = False
+    X_mark.iloc[-int(len_mov_avg/2),:] = False
+    
+    Y[X_mark] = numpy.nan
+    
+        
+    #------------ Não marca os intervalos selecionados ------------#   
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+    
+    
+    
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
+    
+    #For debug
+    if(plot):
+        ax = X_moving_median.plot()
+        x_in.plot(ax=ax)
+        X_mad.plot(ax=ax)
+        X_moving_down.plot(ax=ax)
+        X_moving_up.plot(ax=ax)
+        Y.plot()
+        
+        
+           
+    return Y
 
+def MarkNanPeriod(x_in: pandas.core.frame.DataFrame,
+                 df_remove: pandas.core.frame.DataFrame,
+                 remove_from_process: list = []) -> pandas.core.frame.DataFrame:
+    """
+    Marks as nan all specified timestamps
 
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param df_remove: List of periods to mark as nan. The fisrt column with the start and the sencond column with the end date all in datetime.
+    :type df_remove: pandas.core.frame.DataFrame
+    
+    :param remove_from_process: Columns to be kept off the process;  
+    :type remove_from_process: list,optional
+    
+    :return: Y: The input pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
+    :rtype: Y: pandas.core.frame.DataFrame   
 
+    """
+    
+    Y = x_in.copy(deep=True)    
 
+    #Remove the keep out columns
+    if(len(remove_from_process)>0):         
+        Y = Y.drop(remove_from_process,axis=1)
+         
+    for index,row in df_remove.iterrows():
+        Y.loc[numpy.logical_and(Y.index>=row[0],Y.index<=row[1]),Y.columns.difference(remove_from_process)] = numpy.nan        
+        
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
+        
+    return Y
 
+def RemoveOutliersHardThreshold(x_in: pandas.core.frame.DataFrame,
+                                hard_max: float,
+                                hard_min: float,
+                                remove_from_process: list = [],
+                                df_avoid_periods = pandas.DataFrame([])) -> pandas.core.frame.DataFrame:
+    """
+    Removes outliers from the timeseries on each column using threshold.
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+     
+    :param hard_max: Max value for the threshold limit 
+    :type hard_max: float
+
+    :param hard_min: Min value for the threshold limit
+    :type hard_min: float
+     
+    :param remove_from_process: Columns to be kept off the process;  
+    :type remove_from_process: list,optional
+         
+    :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
+    :type df_avoid_periods: pandas.core.frame.DataFrame
+         
+    
+    :return: Y: A pandas.core.frame.DataFrame without the outliers
+    :rtype: Y: pandas.core.frame.DataFrame
+
+    """
+    X = x_in.copy(deep=True)   
+
+    #Remove keepout columns
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)        
+        
+    Y = X.copy(deep=True)    
+    
+    Y[Y>=hard_max] = numpy.nan
+    Y[Y<=hard_min] = numpy.nan
+    
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
+    
+    return Y
+
+def RemoveOutliersQuantile(x_in:  pandas.core.frame.DataFrame,
+                           remove_from_process: list = [],
+                           df_avoid_periods = pandas.DataFrame([])) -> pandas.core.frame.DataFrame:
+    """
+     Removes outliers from the timeseries on each column using the top and bottom
+     quantile metric as an outlier marker.
+     
+     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+     quantity time series.    
+     :type x_in: pandas.core.frame.DataFrame
+     
+     :param remove_from_process: Columns to be kept off the process;  
+     :type remove_from_process: list,optional
+     
+     :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
+     :type df_avoid_periods: pandas.core.frame.DataFrame
+          
+     
+     :return: Y: A pandas.core.frame.DataFrame without the outliers
+     :rtype: Y: pandas.core.frame.DataFrame
+     
+    """
+    
+    X = x_in.copy(deep=True)  
+    
+    #Remove the keep out columns
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)
+    
+    Y = X.copy(deep=True)
+        
+    for col_name in Y.columns:
+        q1 = X[col_name].quantile(0.25)
+        q3 = X[col_name].quantile(0.75)
+        iqr = q3-q1 #Interquartile range
+        fence_low  = q1-1.5*iqr
+        fence_high = q3+1.5*iqr
+        Y.loc[(Y[col_name] < fence_low) | (Y[col_name] > fence_high),col_name] = numpy.nan
+        
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+        
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
+        
+    return Y
 
 
 

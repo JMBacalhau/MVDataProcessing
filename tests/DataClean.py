@@ -224,114 +224,6 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
     
    
 
-#TODO FROM HERE
-
-#TODO     
-def SimpleProcess(x_in,
-                  start_date_dt,
-                  end_date_dt,
-                  sample_freq = 5,
-                  pre_interpol=False,
-                  pos_interpol=False,
-                  prop_phases=False,
-                  integrate=False,
-                  interpol_integrate=False)-> pd.DataFrame:
-    
-    """
-    
-    Simple pre-made inputation process.
-    
-    ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
-    
-    
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column 
-    contain an electrical quantity time series.    
-    :type x_in: pandas.core.frame.DataFrame
-
-
-
-
-    """
-    
-    X = x_in.copy(deep=True)
-        
-    #
-    
-    #Organize samples
-    Y = f_remove.DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
-    
-    #Interpolate before proportion between phases
-    if(pre_interpol!=False):
-        Y = Y.interpolate(method_type='linear',limit=pre_interpol)
-    
-    #Uses proportion between phases
-    if(prop_phases!=False):    
-        Y = f_remove.PhaseProportonInput(Y,threshold_accept = 0.60,remove_from_process=['IN'])
-    
-    #Interpolate after proportion between phases
-    if(pos_interpol!=False):
-        Y = Y.interpolate(method_type='linear',limit=pos_interpol)        
-             
-    #Integralization 1h
-    if(integrate!=False):        
-        Y = f_remove.IntegrateHour(Y,sample_freq = 5)        
-        
-        #Interpolate after Integralization 1h
-        if(interpol_integrate!=False):
-            Y = Y.interpolate(method_type='linear',limit=interpol_integrate)                              
-        
-    
-    return Y
-
-
-
-
-
-
-
-
-#TODO DOUBLE SIDE , LOWER, HIGHER, AVOID PHASE
-def RemoveOutliersHistoGram(x_in: pandas.core.frame.DataFrame,
-                            df_avoid_periods: pd.DataFrame = pandas.DataFrame([]),
-                            integrate_hour: bool = True,
-                            sample_freq: int = 5,
-                            min_number_of_samples_limit: int  =12) -> pandas.core.frame.DataFrame:
-    """
-    Removes outliers from the timeseries on each column using the histogram.
-    The parameter 'min_number_of_samples_limit' specify the minimum amount of hours in integrate flag is True/samples
-    that a value must have to be considered not an outlier.    
-
-
-    """
-    
-    Y = x_in.copy(deep=True)
-    
-    #Remove outliers ouside the avoid period 
-    if(integrate_hour):
-        Y_int = f_remove.IntegrateHour(Y,sample_freq)    
-        Y_int = Y_int.reset_index(drop=True)    
-    
-    for col in Y_int:
-        Y_int[col] = Y_int[col].sort_values(ascending=False,ignore_index=True)
-    
-    if(Y_int.shape[0]<min_number_of_samples_limit):
-        min_number_of_samples_limit = Y_int.shape[0]
-    
-    threshold_max =  Y_int.iloc[min_number_of_samples_limit+1,:]
-    threshold_min =  Y_int.iloc[-min_number_of_samples_limit-1,:]
-        
-    for col in Y:
-        Y.loc[np.logical_or(Y[col]>threshold_max[col],Y[col]<threshold_min[col]),col] = np.nan
-            
-    if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = f_remove.SavePeriod(x_in,df_avoid_periods)        
-        Y.loc[index_return,:] = df_values
-     
-    return Y
-
-
-
-
 
 if __name__ == "__main__":
     
@@ -433,7 +325,7 @@ if __name__ == "__main__":
     output = f_remove.RemoveOutliersQuantile(output)    
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
-    output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
+    output = f_remove.RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
     

@@ -1337,7 +1337,7 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
                   sample_time_base: str = 'm',
                   pre_interpol:int = False,
                   pos_interpol:int = False,
-                  prop_phases:int = False,
+                  prop_phases:bool = False,
                   integrate:bool = False,
                   interpol_integrate:int = False)-> pandas.core.frame.DataFrame:
     
@@ -1373,7 +1373,10 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
     
     :param pos_interpol: Number of samples to limit the second interpolation after PhaseProportonInput the data. Defaults to False.
     :type pos_interpol: int,optional
-
+    
+    :param prop_phases: Apply the PhaseProportonInput method
+    :type prop_phases: bool,optional
+    
     :param integrate: Integrates to 1 hour time stamps. Defaults to False.
     :type integrate: bool,optional
 
@@ -1385,11 +1388,9 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
 
     """
     
-    X = x_in.copy(deep=True)
-        
-    
+          
     #Organize samples
-    Y = DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base=sample_time_base)
+    Y = DataSynchronization(x_in,start_date_dt,end_date_dt,sample_freq,sample_time_base=sample_time_base)
     
     #Interpolate before proportion between phases
     if(pre_interpol!=False):

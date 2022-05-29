@@ -231,22 +231,35 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
 
 
 #TODO     
-def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False,pos_interpol=False,prop_phases=False,integrate=False,interpol_integrate=False):    
+def SimpleProcess(x_in,
+                  start_date_dt,
+                  end_date_dt,
+                  sample_freq = 5,
+                  pre_interpol=False,
+                  pos_interpol=False,
+                  prop_phases=False,
+                  integrate=False,
+                  interpol_integrate=False)-> pd.DataFrame:
+    
     """
+    
+    Simple pre-made inputation process.
+    
+    ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
 
-    :param X: param start_date_dt:
-    :param end_date_dt: param sample_freq:  (Default value = 5)
-    :param pre_interpol: Default value = False)
-    :param pos_interpol: Default value = False)
-    :param prop_phases: Default value = False)
-    :param integrate: Default value = False)
-    :param interpol_integrate: Default value = False)
-    :param start_date_dt: 
-    :param sample_freq:  (Default value = 5)
+
+
 
     """
+    
+    X = x_in.copy(deep=True)
         
-    #ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
+    #
     
     #Organize samples
     Y = f_remove.DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base='m')
@@ -254,6 +267,10 @@ def SimpleProcess(X,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=False
     #Interpolate before proportion between phases
     if(pre_interpol!=False):
         Y = Y.interpolate(method_type='linear',limit=pre_interpol)
+    
+    #Uses proportion between phases
+    if(prop_phases!=False):    
+        Y = f_remove.PhaseProportonInput(Y,threshold_accept = 0.60,remove_from_process=['IN'])
     
     #Interpolate after proportion between phases
     if(pos_interpol!=False):
@@ -361,8 +378,7 @@ def RemoveOutliersHistoGram(x_in: pd.DataFrame,
     return Y
 
 def RemoveOutliersQuantile(x_in:  pd.DataFrame,
-                           col_names: list = [],
-                           drop: bool = False) -> pd.DataFrame:
+                           col_names: list = []) -> pd.DataFrame:
     """
      Removes outliers from the timeseries on each column using the top and bottom
      quantile metric as an outlier marker.
@@ -383,8 +399,6 @@ def RemoveOutliersQuantile(x_in:  pd.DataFrame,
         fence_high = q3+1.5*iqr
         Y.loc[(Y[col_name] < fence_low) | (Y[col_name] > fence_high),col_name] = np.nan
         
-    if(drop):
-        Y.dropna(inplace=True)
     
     return Y
 
@@ -567,7 +581,7 @@ if __name__ == "__main__":
     output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4)   
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
-    output = RemoveOutliersQuantile(output,drop=False)    
+    output = RemoveOutliersQuantile(output)    
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        

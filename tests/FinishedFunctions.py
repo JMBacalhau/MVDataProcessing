@@ -894,3 +894,83 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
 
     
     return Y
+
+def CountMissingData(x_in: pandas.DataFrame, remove_from_process: list = [],show=False) -> float:
+    """
+    Calculates the number of vacacies on the dataset.
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param remove_from_process: Columns to be kept off the process.
+    :type remove_from_process: list,optional
+    
+    :param show: Specify if the function should print or not the value that is also returned.  
+    :type show: bool,optional
+    
+    
+    :return: Y: Returns the amount of vacancies.
+    :rtype: Y: float
+
+    """
+    Y = x_in.loc[:,x_in.columns.difference(remove_from_process)].isnull().sum().sum()   
+    if(show):
+        print(f"Total number of missing samples {Y}")
+   
+    return Y
+
+def CalcUnbalance(x_in: pandas.DataFrame,remove_from_process: list = []) -> pandas.DataFrame:
+    """
+    Calculates the unbalance between phases for every timestamp.
+    
+    Equation:
+        Y = (MAX-MEAN)/MEAN
+    
+    Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param remove_from_process: Columns to be kept off the process.
+    :type remove_from_process: list,optional
+    
+    :return: Y: A pandas.core.frame.DataFrame with the % of unbalance between columns (phases).
+    :rtype: Y: pandas.core.frame.DataFrame
+    
+    """
+    
+    X = x_in.loc[:,x_in.columns.difference(remove_from_process)]
+    
+    Y = pandas.DataFrame([],index=x_in.index)    
+    
+    Y['Unbalance'] = 100*(X.max(axis=1)-X.mean(axis=1))/X.mean(axis=1)
+    
+    return Y
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

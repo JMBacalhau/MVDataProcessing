@@ -5,7 +5,7 @@ Created on Mon Apr 18 06:45:44 2022
 
 Part1
 
-7) Comment, clean and finish some functions
+8) Create test and example code for simple process
 
 
 Part2
@@ -336,16 +336,19 @@ if __name__ == "__main__":
     
     #output.plot()
     
+      
+    output2 = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
+   
+  
+    
     output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     
     
     
-   
-    
-    
-    #output.plot()
+    output.plot()
+    output2.plot()
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)

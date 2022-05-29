@@ -17,22 +17,6 @@ def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_fo
     """
     Simple code profiler.
     
-    
-    :param time_stopper: A List that will hold all the stop times.
-    :type time_stopper: list
-    
-    :param name: A name for this instance of time profile. Defaults to empty.
-    :type name: str, optional
-    
-    :param show: If True shows the data on the console. Defaults to False.
-    :type show: bool, optional
-    
-    :param estimate_for: A multiplier to be applied at the end. Takes the whole time analized and multiplies by "estimate_for".
-    :type estimate_for: int
-    
-    :return: None
-    :rtype: None
-    
     How to use:
         
     Create a list ->  time_stopper = []   
@@ -61,6 +45,22 @@ def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_fo
     
     The estimate_for parameter makes the calculation as if you would run x times the code analyzed.
     
+    
+    :param time_stopper: A List that will hold all the stop times.
+    :type time_stopper: list
+    
+    :param name: A name for this instance of time profile. Defaults to empty.
+    :type name: str, optional
+    
+    :param show: If True shows the data on the console. Defaults to False.
+    :type show: bool, optional
+    
+    :param estimate_for: A multiplier to be applied at the end. Takes the whole time analized and multiplies by "estimate_for".
+    :type estimate_for: int
+    
+    :return: None
+    :rtype: None
+        
     """
     
     
@@ -255,7 +255,7 @@ def DataSynchronization(x_in: pandas.core.frame.DataFrame,
     
     return Y
 
-def IntegrateHour(x_in: pandas.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pandas.DataFrame:
+def IntegrateHour(x_in: pandas.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
     """
     Integrates the input pandas.core.frame.DataFrame to an hour samples.
     
@@ -342,7 +342,7 @@ def DayPeriodMapper(hour: int) -> int:
         3
     )
 
-def DayPeriodMapperVet(hour: pandas.Series) -> pandas.Series:
+def DayPeriodMapperVet(hour: pandas.Series) -> pandas.core.frame.Series:
     """
     Maps a given hour to one of four periods of a day.
     
@@ -370,7 +370,7 @@ def DayPeriodMapperVet(hour: pandas.Series) -> pandas.Series:
     
     return period_day
 
-def YearPeriodMapperVet(month: pandas.Series) -> pandas.Series:
+def YearPeriodMapperVet(month: pandas.Series) -> pandas.core.frame.Series:
     """
     Maps a given month to one of two periods of an year, being dry and humid .
     
@@ -394,7 +394,7 @@ def YearPeriodMapperVet(month: pandas.Series) -> pandas.Series:
 
 def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
                         threshold_accept: float = 0.75,
-                        remove_from_process = []) -> pandas.DataFrame:
+                        remove_from_process = []) -> pandas.core.frame.DataFrame:
     """
     Makes the imputation of missing data samples based on the ration between columns. (time series)
     
@@ -895,7 +895,7 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
     
     return Y
 
-def CountMissingData(x_in: pandas.DataFrame, remove_from_process: list = [],show=False) -> float:
+def CountMissingData(x_in: pandas.core.frame.DataFrame, remove_from_process: list = [],show=False) -> float:
     """
     Calculates the number of vacacies on the dataset.
     
@@ -921,7 +921,7 @@ def CountMissingData(x_in: pandas.DataFrame, remove_from_process: list = [],show
    
     return Y
 
-def CalcUnbalance(x_in: pandas.DataFrame,remove_from_process: list = []) -> pandas.DataFrame:
+def CalcUnbalance(x_in: pandas.core.frame.DataFrame,remove_from_process: list = []) -> pandas.core.frame.DataFrame:
     """
     Calculates the unbalance between phases for every timestamp.
     

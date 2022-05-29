@@ -226,10 +226,6 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
 
 #TODO FROM HERE
 
-
-
-
-
 #TODO     
 def SimpleProcess(x_in,
                   start_date_dt,
@@ -248,8 +244,8 @@ def SimpleProcess(x_in,
     ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
     
     
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column 
+    contain an electrical quantity time series.    
     :type x_in: pandas.core.frame.DataFrame
 
 
@@ -287,63 +283,19 @@ def SimpleProcess(x_in,
     
     return Y
 
-def RemovePeriod(x_in: pd.DataFrame,df_remove: pd.DataFrame,remove_from_process: list = []) -> pd.DataFrame:
-    """
-    Marks as nan all specified timestamps
-
-    """
-    
-    Y = x_in.copy(deep=True)    
-     
-    for index,row in df_remove.iterrows():
-        Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),Y.columns.difference(remove_from_process)] = np.nan        
-        
-    return Y
-
-def SavePeriod(x_in: pd.DataFrame,df_save: pd.DataFrame) -> tuple:    
-    """
-    For a given set of periods (Start->End) returns the 
-
-    Tá bugada!!!!!!!!!
 
 
-    """
-    
-    Y = x_in.copy(deep=True)
-    mark_index_not = x_in.index    
-    
-    for index,row in df_save.iterrows():
-        Y = Y.loc[np.logical_and(Y.index>=row[0],Y.index<=row[1]),:]
-        mark_index_not = mark_index_not[np.logical_and(mark_index_not>=row[0],mark_index_not<=row[1])]    
-    
-    return Y,mark_index_not
 
-def RemoveOutliersHardThreshold(x_in: pd.DataFrame,
-                                hard_max: bool = False,
-                                hard_min: bool = False,
-                                df_avoid_periods = pd.DataFrame([])) -> pd.DataFrame:
-    """
-    Removes outliers from the timeseries on each column using threshold.
 
-    """
-        
-    Y = x_in.copy(deep=True)    
-    
-    Y[Y>=hard_max] = np.nan
-    Y[Y<=hard_min] = np.nan
-    
-    if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
-        Y.loc[index_return,:] = df_values
 
-    return Y
+
 
 #TODO DOUBLE SIDE , LOWER, HIGHER, AVOID PHASE
-def RemoveOutliersHistoGram(x_in: pd.DataFrame,
-                            df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
+def RemoveOutliersHistoGram(x_in: pandas.core.frame.DataFrame,
+                            df_avoid_periods: pd.DataFrame = pandas.DataFrame([]),
                             integrate_hour: bool = True,
                             sample_freq: int = 5,
-                            min_number_of_samples_limit: int  =12) -> pd.DataFrame:
+                            min_number_of_samples_limit: int  =12) -> pandas.core.frame.DataFrame:
     """
     Removes outliers from the timeseries on each column using the histogram.
     The parameter 'min_number_of_samples_limit' specify the minimum amount of hours in integrate flag is True/samples
@@ -372,112 +324,9 @@ def RemoveOutliersHistoGram(x_in: pd.DataFrame,
         Y.loc[np.logical_or(Y[col]>threshold_max[col],Y[col]<threshold_min[col]),col] = np.nan
             
     if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
+        df_values,index_return = f_remove.SavePeriod(x_in,df_avoid_periods)        
         Y.loc[index_return,:] = df_values
      
-    return Y
-
-def RemoveOutliersQuantile(x_in:  pd.DataFrame,
-                           col_names: list = []) -> pd.DataFrame:
-    """
-     Removes outliers from the timeseries on each column using the top and bottom
-     quantile metric as an outlier marker.
-     
-    """
-    
-    Y = x_in.copy(deep=True)
-    
-    #If not specified runs on every coluns
-    if(len(col_names)==0):
-        col_names = x_in.columns
-            
-    for col_name in col_names:
-        q1 = x_in[col_name].quantile(0.25)
-        q3 = x_in[col_name].quantile(0.75)
-        iqr = q3-q1 #Interquartile range
-        fence_low  = q1-1.5*iqr
-        fence_high = q3+1.5*iqr
-        Y.loc[(Y[col_name] < fence_low) | (Y[col_name] > fence_high),col_name] = np.nan
-        
-    
-    return Y
-
-def RemoveOutliersMMADMM(x_in: pd.DataFrame,
-                         df_avoid_periods: pd.DataFrame = pd.DataFrame([]),
-                         len_mov_avg: int = 4*12,
-                         std_def: int = 2,
-                         min_var_def: float = 0.5,
-                         allow_negatives: bool = False,
-                         plot: bool =False) -> pd.DataFrame:
-    """
-    Removes outliers from the timeseries on each column using the (M)oving (M)edian (A)bslute 
-    (D)eviation around the (M)oving (M)edian. 
-     
-
-    """
-        
-    Y = x_in.copy(deep=True)  
-          
-    # ------------------------ OUTLIERS ------------------------            
-
-    X_mark_outlier = x_in.copy(deep=True)
-    X_mark_outlier.loc[:,:] = False    
-    
-    #---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL   
-    X_mad = x_in.copy(deep=True)
-    X_moving_median = x_in.copy(deep=True)
-    X_moving_up = x_in.copy(deep=True)
-    X_moving_down = x_in.copy(deep=True)
-      
-    # DESVIO PADRÂO ABSOLUTO ENTORNO DA MEDIANA MOVEL
-                       
-    #------------ Computa Mediana Móvel ------------#                                      
-    X_moving_median = X_moving_median.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))
-           
-    X_moving_median.iloc[-2*len_mov_avg:,:] = X_moving_median.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
-    X_moving_median.iloc[:2*len_mov_avg,:] = X_moving_median.iloc[:2*len_mov_avg,:].fillna(method='bfill')
-    
-    #------------ Computa MAD Móvel ------------#       
-    X_mad = x_in-X_moving_median       
-    X_mad = X_mad.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))       
-    X_mad.iloc[-2*len_mov_avg:,:] = X_mad.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
-    X_mad.iloc[:2*len_mov_avg,:] = X_mad.iloc[:2*len_mov_avg,:].fillna(method='bfill')
-           
-    #------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#       
-    X_mad[X_mad<=min_var_def]= min_var_def
-    
-    #------------ MAD Móvel Limites ------------#       
-    X_moving_up = X_moving_median+std_def*X_mad
-    X_moving_down = X_moving_median-std_def*X_mad
-    
-    #------------ Allow the lower limit to go negative. Only valid for kVar or bi-directional current/Power. ------------#
-    if(~allow_negatives):
-        X_moving_down[X_moving_down<=0] = 0
-               
-    #------------ Marcando outliers ------------#
-    X_mark = (x_in>=X_moving_up) | (x_in<=X_moving_down)
-    
-    #------------ Não marca os intervalos onde não foi possível determinar ------------#   
-    X_mark[ X_moving_up.isnull() | X_moving_down.isnull() ] = False              
-    X_mark.iloc[:int(len_mov_avg/2),:] = False
-    X_mark.iloc[-int(len_mov_avg/2),:] = False
-    
-    Y[X_mark] = np.nan
-    
-    #------------ Não marca os intervalos selecionados ------------#   
-    if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(x_in,df_avoid_periods)        
-        Y.loc[index_return,:] = df_values
-    
-    if(plot):
-        ax = X_moving_median.plot()
-        x_in.plot(ax=ax)
-        X_mad.plot(ax=ax)
-        X_moving_down.plot(ax=ax)
-        X_moving_up.plot(ax=ax)
-        
-        
-           
     return Y
 
 
@@ -575,13 +424,13 @@ if __name__ == "__main__":
     
     f_remove.CountMissingData(output,show=True)    
     time_stopper.append(['DataSynchronization',time.perf_counter()])    
-    f_remove.output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
+    f_remove.output = f_remove.RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
     f_remove.CountMissingData(output,show=True)
-    time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])
-    output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4)   
+    time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])    
+    output = f_remove.RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4,plot=False,remove_from_process=['IN'])         
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
-    output = RemoveOutliersQuantile(output)    
+    output = f_remove.RemoveOutliersQuantile(output)    
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
@@ -615,7 +464,7 @@ if __name__ == "__main__":
     #TESTED - OK #dummy = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #TESTED - OK #output = ReturnOnlyValidDays(dummy,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm')
     #TESTED - OK #output = GetDayMaxMin(dummy,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max')
-    #TESTED - OK #output = RemovePeriod(dummy,dummy_manobra)
+    #TESTED - OK #output = MarkNanPeriod(dummy,dummy_manobra)
     #TESTED - OK #output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     
     
@@ -632,77 +481,3 @@ if __name__ == "__main__":
     #------------------#
     
     f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
-
-
-'''
-
-BaseException
- +-- SystemExit
- +-- KeyboardInterrupt
- +-- GeneratorExit
- +-- Exception
-      +-- StopIteration
-      +-- StopAsyncIteration
-      +-- ArithmeticError
-      |    +-- FloatingPointError
-      |    +-- OverflowError
-      |    +-- ZeroDivisionError
-      +-- AssertionError
-      +-- AttributeError
-      +-- BufferError
-      +-- EOFError
-      +-- ImportError
-      |    +-- ModuleNotFoundError
-      +-- LookupError
-      |    +-- IndexError
-      |    +-- KeyError
-      +-- MemoryError
-      +-- NameError
-      |    +-- UnboundLocalError
-      +-- OSError
-      |    +-- BlockingIOError
-      |    +-- ChildProcessError
-      |    +-- ConnectionError
-      |    |    +-- BrokenPipeError
-      |    |    +-- ConnectionAbortedError
-      |    |    +-- ConnectionRefusedError
-      |    |    +-- ConnectionResetError
-      |    +-- FileExistsError
-      |    +-- FileNotFoundError
-      |    +-- InterruptedError
-      |    +-- IsADirectoryError
-      |    +-- NotADirectoryError
-      |    +-- PermissionError
-      |    +-- ProcessLookupError
-      |    +-- TimeoutError
-      +-- ReferenceError
-      +-- RuntimeError
-      |    +-- NotImplementedError
-      |    +-- RecursionError
-      +-- SyntaxError
-      |    +-- IndentationError
-      |         +-- TabError
-      +-- SystemError
-      +-- TypeError
-      +-- ValueError
-      |    +-- UnicodeError
-      |         +-- UnicodeDecodeError
-      |         +-- UnicodeEncodeError
-      |         +-- UnicodeTranslateError
-      +-- Warning
-           +-- DeprecationWarning
-           +-- PendingDeprecationWarning
-           +-- RuntimeWarning
-           +-- SyntaxWarning
-           +-- UserWarning
-           +-- FutureWarning
-           +-- ImportWarning
-           +-- UnicodeWarning
-           +-- BytesWarning
-           +-- EncodingWarning
-           +-- ResourceWarning
-           
-'''
-
-            
-    

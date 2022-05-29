@@ -466,30 +466,9 @@ def RemoveOutliersMMADMM(x_in: pd.DataFrame,
            
     return Y
 
-def CalcUnbalance(x_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculates the unbalance between phases for every timestamp.
-    
-    Equation:
-        Y = (MAX-MEAN)/MEAN
-    
-    Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
-    
-    """
-    
-    Y = pd.DataFrame([],index=x_in.index)    
-    
-    Y['Unbalance'] = 100*(x_in.max(axis=1)-x_in.mean(axis=1))/x_in.mean(axis=1)
-    
-    return Y
 
-def CountMissingData(x_in: pd.DataFrame, remove_from_process: list = [],show=False) -> float:
-    
-    Y = x_in.loc[:,x_in.columns.difference(remove_from_process)].isnull().sum().sum()   
-    if(show):
-        print(f"Total number of missing samples {Y}")
-   
-    return Y
+
+
 
 if __name__ == "__main__":
     
@@ -580,19 +559,19 @@ if __name__ == "__main__":
     #output.plot()
     
     
-    CountMissingData(output,show=True)    
+    f_remove.CountMissingData(output,show=True)    
     time_stopper.append(['DataSynchronization',time.perf_counter()])    
-    output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
-    CountMissingData(output,show=True)
+    f_remove.output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
+    f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])
     output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4)   
-    CountMissingData(output,show=True)
+    f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
     output = RemoveOutliersQuantile(output,drop=False)    
-    CountMissingData(output,show=True)
+    f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
     output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
-    CountMissingData(output,show=True)
+    f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
     
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
@@ -603,7 +582,7 @@ if __name__ == "__main__":
     #output.plot()
     
     output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
-    CountMissingData(output,show=True)
+    f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     
     

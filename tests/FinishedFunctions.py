@@ -1252,10 +1252,167 @@ def RemoveOutliersQuantile(x_in:  pandas.core.frame.DataFrame,
     return Y
 
 
+def RemoveOutliersHistoGram(x_in: pandas.core.frame.DataFrame,
+                            df_avoid_periods: pandas.DataFrame = pandas.DataFrame([]),
+                            remove_from_process: list = [],
+                            integrate_hour: bool = True,
+                            sample_freq: int = 5,
+                            min_number_of_samples_limit: int  =12) -> pandas.core.frame.DataFrame:
+    """
+    Removes outliers from the timeseries on each column using the histogram.
+    The parameter 'min_number_of_samples_limit' specify the minimum amount of hours in integrate flag is True/samples
+    that a value must have to be considered not an outlier.    
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
+    quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param remove_from_process: Columns to be kept off the process;  
+    :type remove_from_process: list,optional
+    
+    :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
+    :type df_avoid_periods: pandas.core.frame.DataFrame
+         
+    :param integrate_hour: Makes the analysis on the data integrated to an hour
+    :type integrate_hour: bool,optional
+         
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+    :type sample_freq: int,optional
+    
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (m)inutes or (s)econds. Defaults to (m)inutes.  
+    :type sample_time_base: srt,optional
+    
+    :param min_number_of_samples_limit: The number of samples to be considered valid
+    :type min_number_of_samples_limit: int,optional
+    
+        
+    :return: Y: A pandas.core.frame.DataFrame without the outliers
+    :rtype: Y: pandas.core.frame.DataFrame
 
 
+    """
+    
+    X = x_in.copy(deep=True)  
+    
+    #Remove the keep out columns
+    if(len(remove_from_process)>0):         
+        X = X.drop(remove_from_process,axis=1)
+    
+    Y = X.copy(deep=True)
+    
+    #Remove outliers ouside the avoid period 
+    if(integrate_hour):
+        Y_int = IntegrateHour(Y,sample_freq)    
+        Y_int = Y_int.reset_index(drop=True)    
+    
+    for col in Y_int:
+        Y_int[col] = Y_int[col].sort_values(ascending=False,ignore_index=True)
+    
+    if(Y_int.shape[0]<min_number_of_samples_limit):
+        min_number_of_samples_limit = Y_int.shape[0]
+    
+    threshold_max =  Y_int.iloc[min_number_of_samples_limit+1,:]
+    threshold_min =  Y_int.iloc[-min_number_of_samples_limit-1,:]
+        
+    for col in Y:
+        Y.loc[numpy.logical_or(Y[col]>threshold_max[col],Y[col]<threshold_min[col]),col] = numpy.nan
+            
+     
+    if(df_avoid_periods.shape[0]!=0):
+        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        Y.loc[index_return,:] = df_values
+        
+    #return the keep out columns
+    if(len(remove_from_process)>0):           
+        Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
+     
+    return Y
 
 
+def SimpleProcess(x_in: pandas.core.frame.DataFrame,
+                  start_date_dt: datetime,
+                  end_date_dt: datetime,
+                  remove_from_process: list = [],
+                  sample_freq:int = 5,
+                  sample_time_base: str = 'm',
+                  pre_interpol:int = False,
+                  pos_interpol:int = False,
+                  prop_phases:int = False,
+                  integrate:bool = False,
+                  interpol_integrate:int = False)-> pandas.core.frame.DataFrame:
+    
+    """
+    
+    Simple pre-made inputation process.
+    
+    ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column 
+    contain an electrical quantity time series.    
+    :type x_in: pandas.core.frame.DataFrame
+
+    :param start_date_dt: The start date where the synchronization should start. 
+    :type start_date_dt: datetime
+    
+    :param end_date_dt: The end date where the synchronization will consider samples.  
+    :type end_date_dt: datetime
+    
+    :param remove_from_process: Columns to be kept off the process Only on PhaseProportonInput step.  
+    :type remove_from_process: list,optional
+    
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+    :type sample_freq: int,optional
+    
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes,
+    or (s)econds. Defaults to (m)inutes.  
+    :type sample_time_base: srt,optional
+    
+    :param pre_interpol: Number of samples to limit the first interpolation after organizing the data. Defaults to False.
+    :type pre_interpol: int,optional
+    
+    :param pos_interpol: Number of samples to limit the second interpolation after PhaseProportonInput the data. Defaults to False.
+    :type pos_interpol: int,optional
+
+    :param integrate: Integrates to 1 hour time stamps. Defaults to False.
+    :type integrate: bool,optional
+
+    :param interpol_integrate: Number of samples to limit the third interpolation after IntegrateHour the data. Defaults to False.
+    :type interpol_integrate: int,optional
+
+    :return: Y: The x_in pandas.core.frame.DataFrame with no missing data. Treated with a simple step process.
+    :rtype: Y: pandas.core.frame.DataFrame
+
+    """
+    
+    X = x_in.copy(deep=True)
+        
+    
+    #Organize samples
+    Y = DataSynchronization(X,start_date_dt,end_date_dt,sample_freq,sample_time_base=sample_time_base)
+    
+    #Interpolate before proportion between phases
+    if(pre_interpol!=False):
+        Y = Y.interpolate(method_type='linear',limit=pre_interpol)
+    
+    #Uses proportion between phases
+    if(prop_phases!=False):    
+        Y = PhaseProportonInput(Y,threshold_accept = 0.60,remove_from_process=remove_from_process)
+    
+    #Interpolate after proportion between phases
+    if(pos_interpol!=False):
+        Y = Y.interpolate(method_type='linear',limit=pos_interpol)        
+             
+    #Integralization 1h
+    if(integrate!=False):        
+        Y = IntegrateHour(Y,sample_freq = 5)        
+        
+        #Interpolate after Integralization 1h
+        if(interpol_integrate!=False):
+            Y = Y.interpolate(method_type='linear',limit=interpol_integrate)                              
+        
+    
+    return Y
 
 
 

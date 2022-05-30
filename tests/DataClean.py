@@ -36,7 +36,6 @@ import datetime as dt
 import numpy as np
 import numpy
 from datetime import datetime
-from itertools import permutations
 import FinishedFunctions as f_remove
 
 #pd.set_option('display.max_rows', None)

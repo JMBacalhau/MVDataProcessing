@@ -745,9 +745,26 @@ def PowerDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):
 
 def EnergyDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):
     
-    dummy = PowerDummyData(start_date,final_date)
+    dummy_S = PowerDummyData(start_date,final_date)
     
+    dummy = pandas.DataFrame([])  
+    
+    dummy['Eactive'] = 
+    
+    dummy['Ereactive'] = 
     
     
     
     return dummy
+
+
+
+
+
+
+
+
+
+
+
+

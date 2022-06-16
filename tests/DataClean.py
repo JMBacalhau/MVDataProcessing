@@ -5,8 +5,6 @@ Created on Mon Apr 18 06:45:44 2022
 
 Part1
 
-8) Create test and example code for simple process
-
 
 Part2
 1) Input
@@ -37,6 +35,7 @@ import numpy as np
 import numpy
 from datetime import datetime
 import FinishedFunctions as f_remove
+
 
 #pd.set_option('display.max_rows', None)
 #pd.set_option('display.max_columns', None)
@@ -221,7 +220,7 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
     return Y
    
     
-   
+
 
 
 if __name__ == "__main__":

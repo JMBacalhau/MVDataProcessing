@@ -10,7 +10,7 @@ import pandas
 import numpy
 import datetime
 import random
-import datetime as dt
+
 
 def CurrentDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):    
     
@@ -304,8 +304,8 @@ def CurrentDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'
                                 [131.1,125.1,119.6,5.3]],columns = ['IA','IB','IV','IN'])
 
     
-    start_date_dt = dt.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = dt.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
+    start_date_dt = datetime.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
+    end_date_dt = datetime.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
      
     dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
     dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
@@ -367,8 +367,8 @@ def CurrentDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'
 
 def VoltageDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):    
     
-    start_date_dt = dt.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = dt.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
+    start_date_dt = datetime.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
+    end_date_dt = datetime.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
      
     dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
     dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
@@ -685,8 +685,8 @@ def PowerFactorDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01
                                     [0.84,0.87,0.89]],columns = ['FPA','FPB','FPV'])
     
     
-    start_date_dt = dt.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = dt.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
+    start_date_dt = datetime.datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
+    end_date_dt = datetime.datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
      
     dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
     dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
@@ -747,11 +747,11 @@ def EnergyDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01')
     
     dummy_S = PowerDummyData(start_date,final_date)
     
-    dummy = pandas.DataFrame([])  
+    dummy = pandas.DataFrame([]) 
     
-    dummy['Eactive'] = 
+    dummy['Eactive'] = dummy_S['P'].cumsum(skipna=True)
     
-    dummy['Ereactive'] = 
+    dummy['Ereactive'] = dummy_S['Q'].abs().cumsum(skipna=True)
     
     
     

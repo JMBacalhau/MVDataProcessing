@@ -309,8 +309,8 @@ if __name__ == "__main__":
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
     output = f_remove.DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-    #output.plot()
     
+    output.plot(title='Input')
     
     f_remove.CountMissingData(output,show=True)    
     time_stopper.append(['DataSynchronization',time.perf_counter()])    
@@ -323,30 +323,32 @@ if __name__ == "__main__":
     output = f_remove.RemoveOutliersQuantile(output)    
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
-    output = f_remove.RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
+    output = f_remove.RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*3)            
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
+    
+    output.plot(title='No outliers')
+    
     
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     
-    #output.plot()
+    _ = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 1.0)
     
-      
-    output2 = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
-   
+    
+    #Simple Process
+    '''
+    output = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
   
-    
-    output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    '''
     
     
     
-    output.plot()
-    output2.plot()
+    output.plot(title='Output')
     
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)

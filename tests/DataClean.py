@@ -98,7 +98,7 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
     
 
     df_count = X.groupby([X.index.year,X.index.month,X.index.day]).count()/(qty_sample_dic[sample_time_base]/sample_freq)    
-    time_vet_stamp = X.index[np.arange(0,len(X.index),int(24*60/sample_freq))]     
+    time_vet_stamp = X.index[np.arange(0,len(X.index),int((qty_sample_dic[sample_time_base]/sample_freq)))]     
     df_count = df_count.reset_index(drop=True)    
     df_count.insert(0,'timestamp_day', time_vet_stamp)
     df_count.set_index('timestamp_day', inplace=True)    
@@ -162,7 +162,7 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
 
     """
     
-    #x_in = dummy.copy(deep=True)
+    x_in = output.copy(deep=True)
     
     X = x_in.copy(deep=True)
     
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
     output = f_remove.DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-    
+    '''
     output.plot(title='Input')
     
     f_remove.CountMissingData(output,show=True)    
@@ -327,15 +327,42 @@ if __name__ == "__main__":
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
     
+       
     output.plot(title='No outliers')
     
     
-    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
+    output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
+    f_remove.CountMissingData(output,show=True)
+    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    '''
+    
+    
+    #NSSC Implementation
+    
+    max_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
-    _ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
+    min_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     
-    _ = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 1.0)
+    weekday_curve = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 1.0)
+    
+    x_in = output.copy(deep=True)
+    
+    
+    qty_data = len(x_in.columns)    
+    sample_freq = 5
+    sample_time_base = 'm'    
+    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
+    vet_amostras = pd.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
+    vet_amostras.index.name = 'timestamp'
+    
+    
+    vet_amostras.index.round('D')
+    
+    vet_amostras.index.weekday
+    
+    
+    
     
     
     #Simple Process

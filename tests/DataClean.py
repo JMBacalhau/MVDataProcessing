@@ -12,16 +12,9 @@ Part2
 
 Part3
 
-1) Reports
-2) Graphs
-3) ToPDF
-
-
-Part4
-
 1) Publish
 
-Part5
+Part4
 
 1) Test on 2021 dataset
 
@@ -361,6 +354,13 @@ if __name__ == "__main__":
     
     vet_amostras.index.weekday
     
+    
+    """
+    Como já existe os vetores de max e min interpolados. EM detrimento em procurar os dias faltantes criar um vetor do zero totalmente estimado.
+    
+    posteriormente realizar o "merge" com o vetor real. Neste ponto posso tratar se vai substituir o dia todo ou apenas o patamar.
+    
+    """
     
     
     

@@ -333,8 +333,10 @@ if __name__ == "__main__":
     #NSSC Implementation
     
     max_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
+    max_vet = max_vet.iloc[np.repeat(np.arange(len(max_vet)), 12*24)]
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     min_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
+    min_vet = min_vet.iloc[np.repeat(np.arange(len(min_vet)), 12*24)]
     time_stopper.append(['GetDayMaxMin',time.perf_counter()])
     
     weekday_curve = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 1.0)
@@ -346,13 +348,35 @@ if __name__ == "__main__":
     sample_freq = 5
     sample_time_base = 'm'    
     timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
-    vet_amostras = pd.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
+    vet_amostras = pd.DataFrame(index=timearray, dtype=object)
+    #vet_amostras = pd.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
     vet_amostras.index.name = 'timestamp'
     
+      
+    num_days = int(vet_amostras.shape[0]/(12*24))
+    first_day = vet_amostras.index[0].weekday()
     
-    vet_amostras.index.round('D')
+    weekday_curve_vet_begin = weekday_curve.iloc[(first_day*12*24):,:].reset_index(drop=True)
+    num_mid_weeks = int(np.floor((num_days-(7-first_day))/7))
+    weekday_curve_vet_mid = pd.concat([weekday_curve]*num_mid_weeks)
+    num_end_days = num_days-num_mid_weeks*7-(7-first_day)
+    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days*(12*24),:].reset_index(drop=True)
     
-    vet_amostras.index.weekday
+    weekday_curve_vet = pd.concat([weekday_curve_vet_begin,weekday_curve_vet_mid,weekday_curve_vet_end])
+    
+    weekday_curve_vet = weekday_curve_vet.reset_index(drop=True)
+    weekday_curve_vet.loc[:,['IA','IB','IV','IV']].plot()
+    
+    weekday_curve_vet.drop(columns=['WeekDay','Hour','Min'],inplace=True)
+    weekday_curve_vet.index.name = 'timestamp'
+    weekday_curve_vet.index = vet_amostras.index
+    
+    max_vet.index = vet_amostras.index
+    min_vet.index = vet_amostras.index
+    
+    X_pred = (max_vet-min_vet)*weekday_curve_vet+min_vet
+    
+    X_pred.plot(title='X_pred')
     
     
     """

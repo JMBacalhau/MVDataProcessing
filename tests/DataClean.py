@@ -124,6 +124,13 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
 
     """
     
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")    
+    
+    
     X = x_in.copy(deep=True)
     
     X,_ = ReturnOnlyValidDays(X,sample_freq,threshold_accept)
@@ -154,6 +161,13 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
     :param sample_freq:  (Default value = 5)
 
     """
+    
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")    
+    
     
     x_in = output.copy(deep=True)
     
@@ -213,7 +227,56 @@ def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_d
     return Y
    
     
-
+def GetNSSCPedrictedSamples(x_in: pd.DataFrame,
+                        max_vet: pd.DataFrame,
+                        min_vet: pd.DataFrame,
+                        weekday_curve: pd.DataFrame,   
+                        sample_freq: int = 5,    
+                        sample_time_base: str = 'm',
+                        remove_from_process = []) -> pd.DataFrame:
+                       
+    
+    #-------------------#
+    # BASIC INPUT CHECK #
+    #-------------------#
+    
+    if not(isinstance(x_in.index, pd.DatetimeIndex)):  raise Exception("DataFrame has no DatetimeIndex.")    
+    if sample_time_base not in ['s','m','h']:  raise Exception("The sample_time_base is not in seconds, minutes or hours.")
+    
+    qty_sample_dic = {'s':60*60,'m':60,'h':1}
+    
+    max_vet = max_vet.iloc[np.repeat(np.arange(len(max_vet)), 12*24)]
+    min_vet = min_vet.iloc[np.repeat(np.arange(len(min_vet)), 12*24)]
+    
+    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
+    vet_amostras = pd.DataFrame(index=timearray, dtype=object)    
+    vet_amostras.index.name = 'timestamp'
+     
+    num_days = int(vet_amostras.shape[0]/(12*24))
+    first_day = vet_amostras.index[0].weekday()
+    
+    weekday_curve_vet_begin = weekday_curve.iloc[(first_day*12*24):,:].reset_index(drop=True)
+    num_mid_weeks = int(np.floor((num_days-(7-first_day))/7))
+    weekday_curve_vet_mid = pd.concat([weekday_curve]*num_mid_weeks)
+    num_end_days = num_days-num_mid_weeks*7-(7-first_day)
+    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days*(12*24),:].reset_index(drop=True)
+    
+    weekday_curve_vet = pd.concat([weekday_curve_vet_begin,weekday_curve_vet_mid,weekday_curve_vet_end])
+    
+    weekday_curve_vet = weekday_curve_vet.reset_index(drop=True)
+    
+    print(weekday_curve_vet)
+    weekday_curve_vet.drop(columns=['WeekDay','Hour','Min'],inplace=True)
+    weekday_curve_vet.index.name = 'timestamp'
+    weekday_curve_vet.index = vet_amostras.index
+    
+    max_vet.index = vet_amostras.index
+    min_vet.index = vet_amostras.index
+    
+    Y = (max_vet-min_vet)*weekday_curve_vet+min_vet
+    
+    
+    return Y
 
 
 if __name__ == "__main__":
@@ -302,7 +365,7 @@ if __name__ == "__main__":
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
     output = f_remove.DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
-    '''
+    
     output.plot(title='Input')
     
     f_remove.CountMissingData(output,show=True)    
@@ -327,68 +390,86 @@ if __name__ == "__main__":
     output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
-    '''
     
     
-    #NSSC Implementation
     
-    max_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')
-    max_vet = max_vet.iloc[np.repeat(np.arange(len(max_vet)), 12*24)]
-    time_stopper.append(['GetDayMaxMin',time.perf_counter()])
+    #NSSC Implementation    
+    max_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')     
+    time_stopper.append(['maxVet',time.perf_counter()])
     min_vet = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='min')    
-    min_vet = min_vet.iloc[np.repeat(np.arange(len(min_vet)), 12*24)]
-    time_stopper.append(['GetDayMaxMin',time.perf_counter()])
-    
-    weekday_curve = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 1.0)
-    
-    x_in = output.copy(deep=True)
-    
-    
-    qty_data = len(x_in.columns)    
-    sample_freq = 5
-    sample_time_base = 'm'    
-    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
-    vet_amostras = pd.DataFrame(index=timearray, dtype=object)
-    #vet_amostras = pd.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
-    vet_amostras.index.name = 'timestamp'
-    
-      
-    num_days = int(vet_amostras.shape[0]/(12*24))
-    first_day = vet_amostras.index[0].weekday()
-    
-    weekday_curve_vet_begin = weekday_curve.iloc[(first_day*12*24):,:].reset_index(drop=True)
-    num_mid_weeks = int(np.floor((num_days-(7-first_day))/7))
-    weekday_curve_vet_mid = pd.concat([weekday_curve]*num_mid_weeks)
-    num_end_days = num_days-num_mid_weeks*7-(7-first_day)
-    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days*(12*24),:].reset_index(drop=True)
-    
-    weekday_curve_vet = pd.concat([weekday_curve_vet_begin,weekday_curve_vet_mid,weekday_curve_vet_end])
-    
-    weekday_curve_vet = weekday_curve_vet.reset_index(drop=True)
-    weekday_curve_vet.loc[:,['IA','IB','IV','IV']].plot()
-    
-    weekday_curve_vet.drop(columns=['WeekDay','Hour','Min'],inplace=True)
-    weekday_curve_vet.index.name = 'timestamp'
-    weekday_curve_vet.index = vet_amostras.index
-    
-    max_vet.index = vet_amostras.index
-    min_vet.index = vet_amostras.index
-    
-    X_pred = (max_vet-min_vet)*weekday_curve_vet+min_vet
+    time_stopper.append(['minVet',time.perf_counter()])
+    weekday_curve = GetWeekDayCurve(output,sample_freq = 5,threshold_accept = 0.6)
+    time_stopper.append(['WeekCurve',time.perf_counter()])
+    X_pred = GetNSSCPedrictedSamples(output,max_vet,min_vet,weekday_curve,sample_freq= 5,sample_time_base = 'm',remove_from_process = [])       
+    time_stopper.append(['NSSC',time.perf_counter()])
     
     X_pred.plot(title='X_pred')
     
     
-    """
-    Como já existe os vetores de max e min interpolados. EM detrimento em procurar os dias faltantes criar um vetor do zero totalmente estimado.
     
-    posteriormente realizar o "merge" com o vetor real. Neste ponto posso tratar se vai substituir o dia todo ou apenas o patamar.
-    
-    """
+    #Criarr as regras para substituir X_pred no vetor x_in
     
     
+    num_samples_day = 12*24
+    day_threshold = 0.5
+    patamar_threshold = 0.5
+    num_samples_patamar = 12*6
+    sample_freq = 5
+    sample_time_base = 'm'
+    
+    output_isnull_day = output.isnull().groupby([output.index.day,output.index.month,output.index.year]).sum()    
+    output_isnull_day = output_isnull_day/num_samples_day
+    
+    output_isnull_day.index.rename(['day','month','year'],inplace=True)    
+    output_isnull_day.reset_index(inplace=True)    
+    output_isnull_day.set_index(output_isnull_day['day'].astype(str) + '-' + output_isnull_day['month'].astype(str) + '-' + output_isnull_day['year'].astype(str),inplace=True)
+    output_isnull_day.drop(columns = ['day', 'month', 'year'],inplace=True)
     
     
+    output_isnull_day = output_isnull_day>=day_threshold        
+    output_isnull_day = output_isnull_day.loc[~(output_isnull_day.sum(axis=1)==0),:]    
+    
+       
+    
+    
+    output_isnull_patamar = output.copy(deep=True)
+    output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(f_remove.DayPeriodMapper)
+    output_isnull_patamar = output.isnull().groupby([output.index.day,output.index.month,output.index.year,output_isnull_patamar.dp]).sum()        
+    output_isnull_patamar =output_isnull_patamar/num_samples_patamar
+    
+    output_isnull_patamar.index.rename(['day', 'month', 'year','dp'],inplace=True)   
+    output_isnull_patamar.reset_index(inplace=True)    
+    output_isnull_patamar.set_index(output_isnull_patamar['day'].astype(str) + '-' + output_isnull_patamar['month'].astype(str) + '-' + output_isnull_patamar['year'].astype(str) + '-' + output_isnull_patamar['dp'].astype(str),inplace=True)
+    output_isnull_patamar.drop(columns = ['day', 'month', 'year','dp'],inplace=True)
+    
+    
+    output_isnull_patamar = output_isnull_patamar>=patamar_threshold        
+    output_isnull_patamar = output_isnull_patamar.loc[~(output_isnull_patamar.sum(axis=1)==0),:]    
+    
+    
+    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
+    mark_substitute = pd.DataFrame(index=timearray,columns = output.columns.values, dtype=object)    
+    mark_substitute.index.name = 'timestamp'
+    mark_substitute.loc[:,:] = False
+       
+    
+    
+    Y = output.copy(deep=True)
+    index_day = { 'day': output.index.day.values.astype(str), 'month': output.index.month.values.astype(str), 'year': output.index.year.values.astype(str) }
+    index_day = pd.DataFrame(index_day)    
+    index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
+    
+    index_patamar = { 'day': output.index.day.values.astype(str), 'month': output.index.month.values.astype(str), 'year': output.index.year.values.astype(str) }
+    index_patamar = pd.DataFrame(index_patamar)    
+    index_patamar['dp'] = output.index.hour.map(f_remove.DayPeriodMapper)
+    index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
+    
+    
+    mark_substitute['index_patamar'] = index_patamar.values
+    mark_substitute['index_day'] = index_day.values
+    
+    
+    aux = pd.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left')
     #Simple Process
     '''
     output = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
@@ -411,8 +492,7 @@ if __name__ == "__main__":
     #TESTED - OK #output = ReturnOnlyValidDays(dummy,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm')
     #TESTED - OK #output = GetDayMaxMin(dummy,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max')
     #TESTED - OK #output = MarkNanPeriod(dummy,dummy_manobra)
-    #TESTED - OK #output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
-    
+    #TESTED - OK #output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])    
     
     
     #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)
@@ -426,4 +506,4 @@ if __name__ == "__main__":
     #   CODE PROFILE   #
     #------------------#
     
-    f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
+    f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=5*1000)

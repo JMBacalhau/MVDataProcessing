@@ -383,6 +383,7 @@ if __name__ == "__main__":
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
     
+    output.iloc[50000:60000,:] = np.nan
        
     output.plot(title='No outliers')
     
@@ -418,6 +419,7 @@ if __name__ == "__main__":
     sample_time_base = 'm'
     
     output_isnull_day = output.isnull().groupby([output.index.day,output.index.month,output.index.year]).sum()    
+    output_isnull_day.columns = output_isnull_day.columns.values + "_mark"
     output_isnull_day = output_isnull_day/num_samples_day
     
     output_isnull_day.index.rename(['day','month','year'],inplace=True)    
@@ -434,7 +436,8 @@ if __name__ == "__main__":
     
     output_isnull_patamar = output.copy(deep=True)
     output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(f_remove.DayPeriodMapper)
-    output_isnull_patamar = output.isnull().groupby([output.index.day,output.index.month,output.index.year,output_isnull_patamar.dp]).sum()        
+    output_isnull_patamar = output.isnull().groupby([output_isnull_patamar.index.day,output_isnull_patamar.index.month,output_isnull_patamar.index.year,output_isnull_patamar.dp]).sum()        
+    output_isnull_patamar.columns = output_isnull_patamar.columns.values + "_mark"
     output_isnull_patamar =output_isnull_patamar/num_samples_patamar
     
     output_isnull_patamar.index.rename(['day', 'month', 'year','dp'],inplace=True)   
@@ -454,7 +457,8 @@ if __name__ == "__main__":
        
     
     
-    Y = output.copy(deep=True)
+    
+    
     index_day = { 'day': output.index.day.values.astype(str), 'month': output.index.month.values.astype(str), 'year': output.index.year.values.astype(str) }
     index_day = pd.DataFrame(index_day)    
     index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
@@ -464,12 +468,34 @@ if __name__ == "__main__":
     index_patamar['dp'] = output.index.hour.map(f_remove.DayPeriodMapper)
     index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
     
-    
+            
     mark_substitute['index_patamar'] = index_patamar.values
+    mark_substitute = pd.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
+    for col in output.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
+    
     mark_substitute['index_day'] = index_day.values
+    mark_substitute = pd.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
+    
+    for col in output.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
     
     
-    aux = pd.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left')
+    
+    output[mark_substitute] = X_pred[mark_substitute] 
+    
+    
+    
+    #A interpolação final precisa pegar o último valor válido de cada dia e não repetir a última amostra
+    
+    
+    
     #Simple Process
     '''
     output = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)

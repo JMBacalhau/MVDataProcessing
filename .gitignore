@@ -13,6 +13,9 @@ __pycache__/
 
 #MYFILES
 *.csv
+*.xml
+.idea/
+.idea/*
 
 # Distribution / packaging
 .Python

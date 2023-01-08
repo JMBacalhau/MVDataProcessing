@@ -260,54 +260,56 @@ def DataSynchronization(x_in: pandas.core.frame.DataFrame,
 
     return df_y
 
-
-def IntegrateHour(x_in: pandas.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
+def IntegrateHour(x_in: pandas.DataFrame, sample_freq: int = 5,
+                  sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
     """
     Integrates the input pandas.core.frame.DataFrame to an hour samples.
-    
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex"
+    and each column contain an electrical quantity time series.
     :type x_in: pandas.core.frame.DataFrame
 
-    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.
     :type sample_freq: int,optional
-    
-    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (m)inutes or (s)econds. Defaults to (m)inutes.  
+
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (m)inutes
+    or (s)econds. Defaults to (m)inutes.
     :type sample_time_base: srt,optional
 
 
-    :raises Exception: if x_in has no DatetimeIndex. 
-    
-    
-    :return: Y: The pandas.core.frame.DataFrame integrated by hour.
-    :rtype: Y: pandas.core.frame.DataFrame
+    :raises Exception: if x_in has no DatetimeIndex.
+
+
+    :return: df_y: The pandas.core.frame.DataFrame integrated by hour.
+    :rtype: df_y: pandas.core.frame.DataFrame
 
     """
-    hour_divider = {'s':60*60,'m':60}
-    
-    #-------------------#
+    hour_divider = {'s': 60 * 60, 'm': 60}
+
+    # -------------------#
     # BASIC INPUT CHECK #
-    #-------------------#
-    
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
-    
-    Y = x_in.copy(deep=True)
-    
-    time_vet_stamp = Y.index[numpy.arange(0,len(Y.index),int(hour_divider[sample_time_base]/sample_freq))]    
-    Y = Y.groupby([Y.index.year,Y.index.month,Y.index.day,Y.index.hour]).mean() 
-    Y = Y.reset_index(drop=True)
-    Y.insert(0,'timestamp', time_vet_stamp)
-    Y.set_index('timestamp', inplace=True)
-    
-    return Y
+    # -------------------#
+
+    if not (isinstance(x_in.index, pandas.DatetimeIndex)): raise Exception("x_in DataFrame has no DatetimeIndex.")
+
+    df_y = x_in.copy(deep=True)
+
+    time_vet_stamp = df_y.index[numpy.arange(0, len(df_y.index), int(hour_divider[sample_time_base] / sample_freq))]
+    df_y = df_y.groupby([df_y.index.year, df_y.index.month, df_y.index.day, df_y.index.hour]).mean()
+    df_y = df_y.reset_index(drop=True)
+    df_y.insert(0, 'timestamp', time_vet_stamp)
+    df_y.set_index('timestamp', inplace=True)
+
+    return df_y
+
 
 def Correlation(x_in: pandas.DataFrame) -> float:
     """
-    Calculates the correlation between each column of the DataFrame and outputs the average of all.    
-    
-    
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    Calculates the correlation between each column of the DataFrame and outputs the average of all.
+
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex"
+    and each column contain an electrical quantity time series.
     :type x_in: pandas.core.frame.DataFrame
 
 
@@ -315,29 +317,29 @@ def Correlation(x_in: pandas.DataFrame) -> float:
     :rtype: corr_value: float
 
     """
-    
-    corr_value = x_in.corr()[x_in.corr()!=1].mean().mean()
-    
+
+    corr_value = x_in.corr()[x_in.corr() != 1].mean().mean()
+
     return corr_value
+
 
 def DayPeriodMapper(hour: int) -> int:
     """
     Maps a given hour to one of four periods of a day.
-    
+
     For 0 to 5 (hour) -> 0 night
     For 6 to 11 (hour) -> 1 moorning
     For 12 to 17 (hour) -> 2 afternoon
     For 18 to 23 (hour) -> 3 evening
-    
+
     :param hour: an hour of the day between 0 and 23.
     :type hour: int
-    
+
     :return: mapped: Period of the day
     :rtype: mapped: int
-    
+
     """
-    
-    
+
     return (
         0 if 0 <= hour < 6
         else
@@ -348,55 +350,59 @@ def DayPeriodMapper(hour: int) -> int:
         3
     )
 
+
 def DayPeriodMapperVet(hour: pandas.core.series.Series) -> pandas.core.series.Series:
     """
     Maps a given hour to one of four periods of a day.
-    
+
     For 0 to 5 (hour) -> 0 night
     For 6 to 11 (hour) -> 1 moorning
     For 12 to 17 (hour) -> 2 afternoon
     For 18 to 23 (hour) -> 3 evening
-    
-    
-    :param hour: A pandas.core.series.Series with values between 0 and 23 to map each hour in the series to a period of the day. 
-    this is a "vector" format for DayPeriodMapper function.
+
+
+    :param hour: A pandas.core.series.Series with values between 0 and 23 to map each hour in the series to a period
+    of the day. this is a "vector" format for DayPeriodMapper function.
     :type hour: pandas.core.series.Series
-    
+
     :return: period_day: The hour pandas.core.series.Series mapped to periods of the day
     :rtype: period_day: pandas.core.series.Series
-    
+
     """
-    
-    map_dict = {0:0,1:0,2:0,3:0,4:0,5:0,
-                6:1,7:1,8:1,9:1,10:1,11:1,
-                12:2,13:2,14:2,15:2,16:2,17:2,
-                18:3,19:3,20:3,21:3,22:3,23:3}
-    
+
+    map_dict = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0,
+                6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1,
+                12: 2, 13: 2, 14: 2, 15: 2, 16: 2, 17: 2,
+                18: 3, 19: 3, 20: 3, 21: 3, 22: 3, 23: 3}
+
     period_day = hour.map(map_dict)
-    
+
     return period_day
+
 
 def YearPeriodMapperVet(month: pandas.core.series.Series) -> pandas.core.series.Series:
     """
     Maps a given month to one of two periods of an year, being dry and humid .
-    
+
     For october to march (month) -> 0 humid
     For april to september (month) -> 1 dry
-    
-    
-    :param month: A pandas.core.series.Series with values between 0 and 12 to map each month in the series to dry or humid.
-    
+
+
+    :param month: A pandas.core.series.Series with values between 0 and 12 to map each month
+    in the series to dry or humid.
+
     :return: season: The months pandas.core.series.Series mapped to dry or humid.
     :rtype: season: pandas.core.series.Series
-    
+
     """
-    
-    map_dict = {10:0,11:0,12:0,1:0,2:0,3:0,
-                4:1,5:1,6:1,7:1,7:1,9:1}
-    
+
+    map_dict = {10: 0, 11: 0, 12: 0, 1: 0, 2: 0, 3: 0,
+                4: 1, 5: 1, 6: 1, 7: 1, 9: 1}
+
     season = month.map(map_dict)
-    
+
     return season
+
 
 def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
                         threshold_accept: float = 0.75,

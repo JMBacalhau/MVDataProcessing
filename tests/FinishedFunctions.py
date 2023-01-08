@@ -409,196 +409,196 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
                         remove_from_process: list = []) -> pandas.core.frame.DataFrame:
     """
     Makes the imputation of missing data samples based on the ration between columns. (time series)
-    
+
     Theory background.:
-        
+
     Correlation between phases (φa,φb, φv) of the same quantity (V, I or pf) is used to infer a missing sample value based on adjacent
     samples. Adjacent samples are those of the same timestamp i but from different phases that the one which is missing.
-    The main idea is to use a period where all three-phases (φa, φb, φv) exist and calculate the proportion between them. 
-    Having the relationship between phases, if one or two are missing in a given timestamp i it is possible to use the 
-    remaining phase and the previous calculated ratio to fill the missing ones. The number of samples used to calculate the 
+    The main idea is to use a period where all three-phases (φa, φb, φv) exist and calculate the proportion between them.
+    Having the relationship between phases, if one or two are missing in a given timestamp i it is possible to use the
+    remaining phase and the previous calculated ratio to fill the missing ones. The number of samples used to calculate the
     ratio around the missing sample is an important parameter. For instance if a sample is missing in the afternoon it is best to
-    use samples from that same day and afternoon to calculate the ratio and fill the missing sample. Unfortunately, there might be not 
+    use samples from that same day and afternoon to calculate the ratio and fill the missing sample. Unfortunately, there might be not
     enough samples in that period to calculate the ratio.Therefore, in this step, different periods T of analysis around the missing sample
     are considered: hour, period of the day (dawn, morning, afternoon and night), day, month, season (humid/dry), and year.
-    
-    
+
+
     The correlation between the feeder energy demand and the period of the day or the season is very high. The increase in consumption in the
-    morning and afternoon in industrial areas is expected as those are 
+    morning and afternoon in industrial areas is expected as those are
     the periods where most factories are fully functioning. In residential areas, the consumption is expected to be higher in the evening; however,
-    it is lower during the day’s early hours. Furthermore, in the summer, a portion of the network (vacation destination) can be in higher demand. 
-    Nonetheless, in another period of the year (winter), the same area could have a lower energy demand. Therefore, if there is not enough 
-    information on that particular day to compute the ratio between phases, a good alternative is to use data from the month. Finally, 
+    it is lower during the day’s early hours. Furthermore, in the summer, a portion of the network (vacation destination) can be in higher demand.
+    Nonetheless, in another period of the year (winter), the same area could have a lower energy demand. Therefore, if there is not enough
+    information on that particular day to compute the ratio between phases, a good alternative is to use data from the month. Finally,
     given the amount of missing data for a particular feeder, the only option could be the use of the whole year to calculate the
     ratio between phases. Regarding the minimum amount of data that a period should have to be valid it
     is assumed the default of 50% for all phases.
-    
-    
+
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
-    :param threshold_accept: The minimum amount of samples to accept. Defaults to 0.75 (75%).  
+
+    :param threshold_accept: The minimum amount of samples to accept. Defaults to 0.75 (75%).
     :type threshold_accept: float,optional
-    
-    :param remove_from_process: Columns to be kept off the process;  
+
+    :param remove_from_process: Columns to be kept off the process;
     :type remove_from_process: list,optional
-    
-    :raises Exception: if x_in has less than two columns to process. 
-    :raises Exception: if x_in has no DatetimeIndex. 
-    
+
+    :raises Exception: if x_in has less than two columns to process.
+    :raises Exception: if x_in has no DatetimeIndex.
+
     :return: Y: The pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
     :rtype: Y: pandas.core.frame.DataFrame
 
     """
-    
-    
+
+
     #-------------------#
     # BASIC INPUT CHECK #
     #-------------------#
-    
+
     if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
-    
+
     #-------------------#
-    
+
     #x_in = output.copy(deep=True)
-    
+
     time_stopper = []
     time_stopper.append(['Init',time.perf_counter()])
-    X = x_in.copy(deep=True)   
+    X = x_in.copy(deep=True)
 
-    if(len(remove_from_process)>0):         
+    if(len(remove_from_process)>0):
         X = X.drop(remove_from_process,axis=1)
 
     if (len(X.columns)<2):  raise Exception("Not enough columns. Need at least two.")
-    
-    
+
+
     #make output vector
-    Y = X.copy(deep=True)    
-    
+    Y = X.copy(deep=True)
+
     time_stopper.append(['Copy',time.perf_counter()])
     #-------------------------#
     #          HOUR           #
     #-------------------------#
 
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,mask_valid.index.hour])                   
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,mask_valid.index.hour])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,mask_null.index.hour])                
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,mask_null.index.hour])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([X.index.year,X.index.month,X.index.day,X.index.hour])                     
+
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day,X.index.hour])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
+
     time_stopper.append(['Hour-Group',time.perf_counter()])
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
+
     time_stopper.append(['Hour-Corr',time.perf_counter()])
-    
-    for i in range(0,len(comb_vet)):        
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
     time_stopper.append(['Hour-Relation',time.perf_counter()])
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-        
-        
-    
+
+
+
     time_stopper.append(['Hour-Y',time.perf_counter()])
-    
+
     time_stopper.append(['Hour',time.perf_counter()])
- 
+
     #-------------------------#
     #          PATAMR         #
     #-------------------------#
 
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,DayPeriodMapperVet(mask_valid.index.hour)]) 
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day,DayPeriodMapperVet(mask_valid.index.hour)])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day,DayPeriodMapperVet(mask_valid.index.hour)])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([X.index.year,X.index.month,X.index.day,DayPeriodMapperVet(mask_valid.index.hour)])                     
+
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day,DayPeriodMapperVet(mask_valid.index.hour)])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
@@ -608,370 +608,370 @@ def PhaseProportonInput(x_in: pandas.core.frame.DataFrame,
     #-------------------------#
     #          DAY            #
     #-------------------------#
-    
+
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day])                   
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month,mask_valid.index.day])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day])                
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month,mask_null.index.day])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([X.index.year,X.index.month,X.index.day])                     
+
+    grouper = X.groupby([X.index.year,X.index.month,X.index.day])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-      
+
     time_stopper.append(['Day',time.perf_counter()])
     #-------------------------#
     #          MONTH          #
     #-------------------------#
-    
+
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month])                   
+    grouper_valid = mask_valid.groupby([mask_valid.index.year,mask_valid.index.month])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month])                
+    grouper_null = mask_null.groupby([mask_null.index.year,mask_null.index.month])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([X.index.year,X.index.month])                     
+
+    grouper = X.groupby([X.index.year,X.index.month])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-        
+
     time_stopper.append(['Month',time.perf_counter()])
     #-------------------------#
     #       HUMID/DRY         #
     #-------------------------#
-    
+
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])                   
+    grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])                
+    grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])                     
+
+    grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-      
+
     time_stopper.append(['Season',time.perf_counter()])
-    
+
     #-------------------------#
     #          YEAR           #
     #-------------------------#
-    
+
     mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year])                   
+    grouper_valid = mask_valid.groupby([mask_valid.index.year])
     count_valid = grouper_valid.transform('sum')
-    
+
     mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year])                
+    grouper_null = mask_null.groupby([mask_null.index.year])
     count_null = grouper_null.transform('sum')
-        
+
     mask_reject = count_valid/(count_null+count_valid)<threshold_accept
-    
-    grouper = X.groupby([X.index.year])                     
+
+    grouper = X.groupby([X.index.year])
     X_mean = grouper.transform('mean')
-    
+
     X_mean[mask_reject] = numpy.nan
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-    
+
     time_stopper.append(['Year',time.perf_counter()])
 
     #-------------------------#
     #     ALL TIME SERIES     #
     #-------------------------#
-        
+
     X_mean = X.copy(deep=True)
-  
-    
+
+
     for col in X_mean.columns.values:
         X_mean[col] = X_mean[col].mean()
 
-    #Make all the possible permutations between columns    
+    #Make all the possible permutations between columns
     comb_vet = list(permutations(range(0,X_mean.shape[1]),r=2))
-    
-    
+
+
     #make columns names
     comb_vet_str = []
     for comb in comb_vet:
         comb_vet_str.append(str(comb[0])+'-' +str(comb[1]))
-    
+
     #Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)        
-    
+    df_relation = pandas.DataFrame(index=X_mean.index,columns=comb_vet_str, dtype=object)
+
     corr_vet =[]
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = X_mean.iloc[:,list(comb)].iloc[:,0]/X_mean.iloc[:,list(comb)].iloc[:,1]
-        
+
         corr = X_mean.iloc[:,list(comb)].iloc[:,0].corr(X_mean.iloc[:,list(comb)].iloc[:,1])
-        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])            
-    
+        corr_vet.append([str(comb[0])+'-' +str(comb[1]),corr])
+
     corr_vet = pandas.DataFrame(corr_vet,columns=['comb','corr'])
     corr_vet.set_index('comb',drop=True,inplace=True)
     corr_vet.sort_values(by=['corr'],ascending=False,inplace=True)
-    
+
     df_relation.replace([numpy.inf, -numpy.inf], numpy.nan,inplace=True)
-    
-    
-    for i in range(0,len(comb_vet)):        
+
+
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         df_relation.loc[:,comb_str] = df_relation.loc[:,comb_str]*X.iloc[:,list(comb)[1]]
 
 
-    for i in range(0,len(comb_vet)):        
+    for i in range(0,len(comb_vet)):
         comb = comb_vet[i]
         comb_str = comb_vet_str[i]
         Y.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:,list(comb)[0]].isnull()) & (~df_relation.loc[:,comb_str].isnull()),comb_str]
-    
+
     time_stopper.append(['AllTimeSeries',time.perf_counter()])
 
 
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-    
-    
+
+
     time_stopper.append(['Final',time.perf_counter()])
-    
+
     TimeProfile(time_stopper,name='Phase',show=False)
 
-    
+
     return Y
 
 def CountMissingData(x_in: pandas.core.frame.DataFrame, remove_from_process: list = [],show=False) -> float:
     """
     Calculates the number of vacacies on the dataset.
-    
-    
+
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
+
     :param remove_from_process: Columns to be kept off the process.
     :type remove_from_process: list,optional
-    
-    :param show: Specify if the function should print or not the value that is also returned.  
+
+    :param show: Specify if the function should print or not the value that is also returned.
     :type show: bool,optional
-    
-    
+
+
     :return: Y: Returns the amount of vacancies.
     :rtype: Y: float
 
     """
-    Y = x_in.loc[:,x_in.columns.difference(remove_from_process)].isnull().sum().sum()   
+    Y = x_in.loc[:,x_in.columns.difference(remove_from_process)].isnull().sum().sum()
     if(show):
         print(f"Total number of missing samples {Y}")
-   
+
     return Y
 
 def CalcUnbalance(x_in: pandas.core.frame.DataFrame,remove_from_process: list = []) -> pandas.core.frame.DataFrame:
     """
     Calculates the unbalance between phases for every timestamp.
-    
+
     Equation:
         Y = (MAX-MEAN)/MEAN
-    
+
     Ref.: Derating of induction motors operating with a combination of unbalanced voltages and over or undervoltages
-    
-    
+
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
+
     :param remove_from_process: Columns to be kept off the process.
     :type remove_from_process: list,optional
-    
+
     :return: Y: A pandas.core.frame.DataFrame with the % of unbalance between columns (phases).
     :rtype: Y: pandas.core.frame.DataFrame
-    
+
     """
-    
+
     X = x_in.loc[:,x_in.columns.difference(remove_from_process)]
-    
-    Y = pandas.DataFrame([],index=x_in.index)    
-    
+
+    Y = pandas.DataFrame([],index=x_in.index)
+
     Y['Unbalance'] = 100*(X.max(axis=1)-X.mean(axis=1))/X.mean(axis=1)
-    
+
     return Y
 
 def SavePeriod(x_in: pandas.core.frame.DataFrame,
-               df_save: pandas.core.frame.DataFrame) -> tuple:    
-    """    
+               df_save: pandas.core.frame.DataFrame) -> tuple:
+    """
     For a given set of periods (Start->End) returns the data. It also return the idexes.
-    
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
+
     :param df_save: The fisrt column with the start and the sencond column with the end date.
     :type df_save: pandas.core.frame.DataFrame
 
@@ -979,14 +979,14 @@ def SavePeriod(x_in: pandas.core.frame.DataFrame,
     :rtype: Y,mark_index_not: tuple
 
     """
-    
+
     Y = x_in.copy(deep=True)
-    mark_index_not = x_in.index    
-    
+    mark_index_not = x_in.index
+
     for index,row in df_save.iterrows():
         Y = Y.loc[numpy.logical_and(Y.index>=row[0],Y.index<=row[1]),:]
-        mark_index_not = mark_index_not[numpy.logical_and(mark_index_not>=row[0],mark_index_not<=row[1])]    
-    
+        mark_index_not = mark_index_not[numpy.logical_and(mark_index_not>=row[0],mark_index_not<=row[1])]
+
     return Y,mark_index_not
 
 def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
@@ -999,44 +999,44 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
                          remove_from_process: list = [],
                          ) -> pandas.core.frame.DataFrame:
     """
-    Removes outliers from the timeseries on each column using the (M)oving (M)edian (A)bslute 
-    (D)eviation around the (M)oving (M)edian. 
-    
-    A statistical method is used for removing the remaining outliers. In LEYS et al. (2019), the authors state that it is 
+    Removes outliers from the timeseries on each column using the (M)oving (M)edian (A)bslute
+    (D)eviation around the (M)oving (M)edian.
+
+    A statistical method is used for removing the remaining outliers. In LEYS et al. (2019), the authors state that it is
     common practice the use of plus and minus the standard deviation (±σ) around the mean (µ), however, this measurement is particularly
-    sensitive to outliers. Furthermore, the authors propose the use of the absolute deviation around the median. 
+    sensitive to outliers. Furthermore, the authors propose the use of the absolute deviation around the median.
     Therefore, in this work the limit was set by the median absolute deviation (MADj) around the moving median (Mj) where j denotes the number of samples
     of the moving window. Typically, an MV feeder has a seasonality where in the summer load is higher than in the winter or vice-versa.
     Hence, it is vital to use the moving median instead of the median of all the time series.
-    
-    
+
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
+
     :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
     :type df_avoid_periods: pandas.core.frame.DataFrame
-    
+
     :param len_mov_avg: Size of the windows of the moving average.
     :type len_mov_avg: int,optional
-    
+
     :param std_def: Absolute standard deviation to be computed around the moving average.
     :type std_def: float,optional
-    
+
     :param min_var_def: For low variance data this parameter will set a minimum distance from the upper and lower boundaries.
     :type min_var_def: float,optional
-     
+
     :param allow_negatives: Alow for the lower level to be below zero.
     :type allow_negatives: bool,optional
-    
+
     :param plot: A plot of the boundaries and result to debug parameters.
     :type plot: bool,optional
-    
+
     :param remove_from_process: Columns to be kept off the process.
     :type remove_from_process: list,optional
-    
-    :raises Exception: if x_in has no DatetimeIndex. 
-    
+
+    :raises Exception: if x_in has no DatetimeIndex.
+
     :return: Y: A pandas.core.frame.DataFrame without the outliers
     :rtype: Y: pandas.core.frame.DataFrame
 
@@ -1044,77 +1044,77 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
     #-------------------#
     # BASIC INPUT CHECK #
     #-------------------#
-    
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
-  
-    
-        
-    X = x_in.copy(deep=True)   
 
-    if(len(remove_from_process)>0):         
+    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
+
+
+
+    X = x_in.copy(deep=True)
+
+    if(len(remove_from_process)>0):
         X = X.drop(remove_from_process,axis=1)
-    
-    
-    Y = X.copy(deep=True)  
-          
-    # ------------------------ OUTLIERS ------------------------            
+
+
+    Y = X.copy(deep=True)
+
+    # ------------------------ OUTLIERS ------------------------
 
     X_mark_outlier = X.copy(deep=True)
-    X_mark_outlier.loc[:,:] = False    
-    
-    #---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL   
+    X_mark_outlier.loc[:,:] = False
+
+    #---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL
     X_mad = X.copy(deep=True)
     X_moving_median = X.copy(deep=True)
     X_moving_up = X.copy(deep=True)
     X_moving_down = X.copy(deep=True)
-      
+
     # DESVIO PADRÂO ABSOLUTO ENTORNO DA MEDIANA MOVEL
-                       
-    #------------ Computa Mediana Móvel ------------#                                      
+
+    #------------ Computa Mediana Móvel ------------#
     X_moving_median = X_moving_median.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))
-           
+
     X_moving_median.iloc[-2*len_mov_avg:,:] = X_moving_median.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
     X_moving_median.iloc[:2*len_mov_avg,:] = X_moving_median.iloc[:2*len_mov_avg,:].fillna(method='bfill')
-    
-    #------------ Computa MAD Móvel ------------#       
-    X_mad = X-X_moving_median       
-    X_mad = X_mad.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))       
+
+    #------------ Computa MAD Móvel ------------#
+    X_mad = X-X_moving_median
+    X_mad = X_mad.rolling(len_mov_avg).median().shift(-int(len_mov_avg/2))
     X_mad.iloc[-2*len_mov_avg:,:] = X_mad.iloc[-2*len_mov_avg:,:].fillna(method='ffill')
     X_mad.iloc[:2*len_mov_avg,:] = X_mad.iloc[:2*len_mov_avg,:].fillna(method='bfill')
-           
-    #------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#       
+
+    #------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#
     X_mad[X_mad<=min_var_def]= min_var_def
-    
-    #------------ MAD Móvel Limites ------------#       
+
+    #------------ MAD Móvel Limites ------------#
     X_moving_up = X_moving_median+std_def*X_mad
     X_moving_down = X_moving_median-std_def*X_mad
-    
+
     #------------ Allow the lower limit to go negative. Only valid for kVar or bi-directional current/Power. ------------#
     if(~allow_negatives):
         X_moving_down[X_moving_down<=0] = 0
-               
+
     #------------ Marcando outliers ------------#
     X_mark = (X>=X_moving_up) | (X<=X_moving_down)
-    
-    #------------ Não marca os intervalos onde não foi possível determinar ------------#   
-    X_mark[ X_moving_up.isnull() | X_moving_down.isnull() ] = False              
+
+    #------------ Não marca os intervalos onde não foi possível determinar ------------#
+    X_mark[ X_moving_up.isnull() | X_moving_down.isnull() ] = False
     X_mark.iloc[:int(len_mov_avg/2),:] = False
     X_mark.iloc[-int(len_mov_avg/2),:] = False
-    
+
     Y[X_mark] = numpy.nan
-    
-        
-    #------------ Não marca os intervalos selecionados ------------#   
+
+
+    #------------ Não marca os intervalos selecionados ------------#
     if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        df_values,index_return = SavePeriod(X,df_avoid_periods)
         Y.loc[index_return,:] = df_values
-    
-    
-    
+
+
+
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-    
+
     #For debug
     if(plot):
         ax = X_moving_median.plot()
@@ -1123,9 +1123,9 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
         X_moving_down.plot(ax=ax)
         X_moving_up.plot(ax=ax)
         Y.plot()
-        
-        
-           
+
+
+
     return Y
 
 def MarkNanPeriod(x_in: pandas.core.frame.DataFrame,
@@ -1135,33 +1135,33 @@ def MarkNanPeriod(x_in: pandas.core.frame.DataFrame,
     Marks as nan all specified timestamps
 
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
+
     :param df_remove: List of periods to mark as nan. The fisrt column with the start and the sencond column with the end date all in datetime.
     :type df_remove: pandas.core.frame.DataFrame
-    
-    :param remove_from_process: Columns to be kept off the process;  
+
+    :param remove_from_process: Columns to be kept off the process;
     :type remove_from_process: list,optional
-    
+
     :return: Y: The input pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
-    :rtype: Y: pandas.core.frame.DataFrame   
+    :rtype: Y: pandas.core.frame.DataFrame
 
     """
-    
-    Y = x_in.copy(deep=True)    
+
+    Y = x_in.copy(deep=True)
 
     #Remove the keep out columns
-    if(len(remove_from_process)>0):         
+    if(len(remove_from_process)>0):
         Y = Y.drop(remove_from_process,axis=1)
-         
+
     for index,row in df_remove.iterrows():
-        Y.loc[numpy.logical_and(Y.index>=row[0],Y.index<=row[1]),Y.columns.difference(remove_from_process)] = numpy.nan        
-        
+        Y.loc[numpy.logical_and(Y.index>=row[0],Y.index<=row[1]),Y.columns.difference(remove_from_process)] = numpy.nan
+
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-        
+
     return Y
 
 def RemoveOutliersHardThreshold(x_in: pandas.core.frame.DataFrame,
@@ -1171,47 +1171,47 @@ def RemoveOutliersHardThreshold(x_in: pandas.core.frame.DataFrame,
                                 df_avoid_periods = pandas.DataFrame([])) -> pandas.core.frame.DataFrame:
     """
     Removes outliers from the timeseries on each column using threshold.
-    
+
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-     
-    :param hard_max: Max value for the threshold limit 
+
+    :param hard_max: Max value for the threshold limit
     :type hard_max: float
 
     :param hard_min: Min value for the threshold limit
     :type hard_min: float
-     
-    :param remove_from_process: Columns to be kept off the process;  
+
+    :param remove_from_process: Columns to be kept off the process;
     :type remove_from_process: list,optional
-         
+
     :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
     :type df_avoid_periods: pandas.core.frame.DataFrame
-         
-    
+
+
     :return: Y: A pandas.core.frame.DataFrame without the outliers
     :rtype: Y: pandas.core.frame.DataFrame
 
     """
-    X = x_in.copy(deep=True)   
+    X = x_in.copy(deep=True)
 
     #Remove keepout columns
-    if(len(remove_from_process)>0):         
-        X = X.drop(remove_from_process,axis=1)        
-        
-    Y = X.copy(deep=True)    
-    
+    if(len(remove_from_process)>0):
+        X = X.drop(remove_from_process,axis=1)
+
+    Y = X.copy(deep=True)
+
     Y[Y>=hard_max] = numpy.nan
     Y[Y<=hard_min] = numpy.nan
-    
+
     if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        df_values,index_return = SavePeriod(X,df_avoid_periods)
         Y.loc[index_return,:] = df_values
 
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-    
+
     return Y
 
 def RemoveOutliersQuantile(x_in:  pandas.core.frame.DataFrame,
@@ -1220,31 +1220,31 @@ def RemoveOutliersQuantile(x_in:  pandas.core.frame.DataFrame,
     """
      Removes outliers from the timeseries on each column using the top and bottom
      quantile metric as an outlier marker.
-     
+
      :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-     quantity time series.    
+     quantity time series.
      :type x_in: pandas.core.frame.DataFrame
-     
-     :param remove_from_process: Columns to be kept off the process;  
+
+     :param remove_from_process: Columns to be kept off the process;
      :type remove_from_process: list,optional
-     
+
      :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
      :type df_avoid_periods: pandas.core.frame.DataFrame
-          
-     
+
+
      :return: Y: A pandas.core.frame.DataFrame without the outliers
      :rtype: Y: pandas.core.frame.DataFrame
-     
+
     """
-    
-    X = x_in.copy(deep=True)  
-    
+
+    X = x_in.copy(deep=True)
+
     #Remove the keep out columns
-    if(len(remove_from_process)>0):         
+    if(len(remove_from_process)>0):
         X = X.drop(remove_from_process,axis=1)
-    
+
     Y = X.copy(deep=True)
-        
+
     for col_name in Y.columns:
         q1 = X[col_name].quantile(0.25)
         q3 = X[col_name].quantile(0.75)
@@ -1252,15 +1252,15 @@ def RemoveOutliersQuantile(x_in:  pandas.core.frame.DataFrame,
         fence_low  = q1-1.5*iqr
         fence_high = q3+1.5*iqr
         Y.loc[(Y[col_name] < fence_low) | (Y[col_name] > fence_high),col_name] = numpy.nan
-        
+
     if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        df_values,index_return = SavePeriod(X,df_avoid_periods)
         Y.loc[index_return,:] = df_values
-        
+
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-        
+
     return Y
 
 
@@ -1273,71 +1273,71 @@ def RemoveOutliersHistoGram(x_in: pandas.core.frame.DataFrame,
     """
     Removes outliers from the timeseries on each column using the histogram.
     The parameter 'min_number_of_samples_limit' specify the minimum amount of hours in integrate flag is True/samples
-    that a value must have to be considered not an outlier.    
+    that a value must have to be considered not an outlier.
 
     :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+    quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-    
-    :param remove_from_process: Columns to be kept off the process;  
+
+    :param remove_from_process: Columns to be kept off the process;
     :type remove_from_process: list,optional
-    
+
     :param df_avoid_periods: The fisrt column with the start and the sencond column with the end date.
     :type df_avoid_periods: pandas.core.frame.DataFrame
-         
+
     :param integrate_hour: Makes the analysis on the data integrated to an hour
     :type integrate_hour: bool,optional
-         
-    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.
     :type sample_freq: int,optional
-    
-    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (m)inutes or (s)econds. Defaults to (m)inutes.  
+
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (m)inutes or (s)econds. Defaults to (m)inutes.
     :type sample_time_base: srt,optional
-    
+
     :param min_number_of_samples_limit: The number of samples to be considered valid
     :type min_number_of_samples_limit: int,optional
-    
-        
+
+
     :return: Y: A pandas.core.frame.DataFrame without the outliers
     :rtype: Y: pandas.core.frame.DataFrame
 
 
     """
-    
-    X = x_in.copy(deep=True)  
-    
+
+    X = x_in.copy(deep=True)
+
     #Remove the keep out columns
-    if(len(remove_from_process)>0):         
+    if(len(remove_from_process)>0):
         X = X.drop(remove_from_process,axis=1)
-    
+
     Y = X.copy(deep=True)
-    
-    #Remove outliers ouside the avoid period 
+
+    #Remove outliers ouside the avoid period
     if(integrate_hour):
-        Y_int = IntegrateHour(Y,sample_freq)    
-        Y_int = Y_int.reset_index(drop=True)    
-    
+        Y_int = IntegrateHour(Y,sample_freq)
+        Y_int = Y_int.reset_index(drop=True)
+
     for col in Y_int:
         Y_int[col] = Y_int[col].sort_values(ascending=False,ignore_index=True)
-    
+
     if(Y_int.shape[0]<min_number_of_samples_limit):
         min_number_of_samples_limit = Y_int.shape[0]
-    
+
     threshold_max =  Y_int.iloc[min_number_of_samples_limit+1,:]
     threshold_min =  Y_int.iloc[-min_number_of_samples_limit-1,:]
-        
+
     for col in Y:
         Y.loc[numpy.logical_or(Y[col]>threshold_max[col],Y[col]<threshold_min[col]),col] = numpy.nan
-            
-     
+
+
     if(df_avoid_periods.shape[0]!=0):
-        df_values,index_return = SavePeriod(X,df_avoid_periods)        
+        df_values,index_return = SavePeriod(X,df_avoid_periods)
         Y.loc[index_return,:] = df_values
-        
+
     #return the keep out columns
-    if(len(remove_from_process)>0):           
+    if(len(remove_from_process)>0):
         Y = pandas.concat([Y,x_in.loc[:,remove_from_process]],axis=1)
-     
+
     return Y
 
 
@@ -1352,43 +1352,43 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
                   prop_phases:bool = False,
                   integrate:bool = False,
                   interpol_integrate:int = False)-> pandas.core.frame.DataFrame:
-    
+
     """
-    
+
     Simple pre-made inputation process.
-    
+
     ORGANIZE->INTERPOLATE->PHASE_PROPORTION->INTERPOLATE->INTEGRATE->INTERPOLATE
-    
-    
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column 
-    contain an electrical quantity time series.    
+
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column
+    contain an electrical quantity time series.
     :type x_in: pandas.core.frame.DataFrame
 
-    :param start_date_dt: The start date where the synchronization should start. 
+    :param start_date_dt: The start date where the synchronization should start.
     :type start_date_dt: datetime
-    
-    :param end_date_dt: The end date where the synchronization will consider samples.  
+
+    :param end_date_dt: The end date where the synchronization will consider samples.
     :type end_date_dt: datetime
-    
-    :param remove_from_process: Columns to be kept off the process Only on PhaseProportonInput step.  
+
+    :param remove_from_process: Columns to be kept off the process Only on PhaseProportonInput step.
     :type remove_from_process: list,optional
-    
-    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.
     :type sample_freq: int,optional
-    
+
     :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes,
-    or (s)econds. Defaults to (m)inutes.  
+    or (s)econds. Defaults to (m)inutes.
     :type sample_time_base: srt,optional
-    
+
     :param pre_interpol: Number of samples to limit the first interpolation after organizing the data. Defaults to False.
     :type pre_interpol: int,optional
-    
+
     :param pos_interpol: Number of samples to limit the second interpolation after PhaseProportonInput the data. Defaults to False.
     :type pos_interpol: int,optional
-    
+
     :param prop_phases: Apply the PhaseProportonInput method
     :type prop_phases: bool,optional
-    
+
     :param integrate: Integrates to 1 hour time stamps. Defaults to False.
     :type integrate: bool,optional
 
@@ -1399,830 +1399,823 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
     :rtype: Y: pandas.core.frame.DataFrame
 
     """
-    
-          
+
+
     #Organize samples
     Y = DataSynchronization(x_in,start_date_dt,end_date_dt,sample_freq,sample_time_base=sample_time_base)
-    
+
     #Interpolate before proportion between phases
     if(pre_interpol!=False):
         Y = Y.interpolate(method_type='linear',limit=pre_interpol)
-    
+
     #Uses proportion between phases
-    if(prop_phases!=False):    
+    if(prop_phases!=False):
         Y = PhaseProportonInput(Y,threshold_accept = 0.60,remove_from_process=remove_from_process)
-    
+
     #Interpolate after proportion between phases
     if(pos_interpol!=False):
-        Y = Y.interpolate(method_type='linear',limit=pos_interpol)        
-             
+        Y = Y.interpolate(method_type='linear',limit=pos_interpol)
+
     #Integralization 1h
-    if(integrate!=False):        
-        Y = IntegrateHour(Y,sample_freq = 5)        
-        
+    if(integrate!=False):
+        Y = IntegrateHour(Y,sample_freq = 5)
+
         #Interpolate after Integralization 1h
         if(interpol_integrate!=False):
-            Y = Y.interpolate(method_type='linear',limit=interpol_integrate)                              
-        
-    
+            Y = Y.interpolate(method_type='linear',limit=interpol_integrate)
+
+
     return Y
 
 
-def CurrentDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):    
-    
-    dummy_day = pandas.DataFrame([[129.2,122.5,118.8,4.7],
-                                [126.3,122.5,118.8,4.7],
-                                [131.3,123,120.9,5.6],
-                                [126.9,121.5,117.8,5],
-                                [126.9,121.5,117.8,5],
-                                [125.4,118.8,116.6,5],
-                                [125.4,118.8,118.5,4.6],
-                                [124.8,117.1,116.6,4.6],
-                                [125.7,118.8,116.1,5],
-                                [125.7,118.8,113.5,4.6],
-                                [125.1,117.4,115,4.5],
-                                [125.1,117.4,115,4.5],
-                                [122.8,115.3,113.5,4.7],
-                                [122.4,113.8,114.7,4.7],
-                                [122.4,113.8,114.7,4.7],
-                                [120.9,114.9,111.5,4.6],
-                                [120.9,111.9,107.8,4.6],
-                                [120.2,114.1,107.8,4.6],
-                                [116.2,114.1,107.8,4.6],
-                                [119.1,114.5,108.3,4.8],
-                                [119.3,112.2,110.5,4.9],
-                                [116.3,112.2,110.5,4.9],
-                                [117.7,110.7,109.1,4.6],
-                                [117.7,110.7,109.1,4.7],
-                                [116.9,109.4,107.6,4.7],
-                                [116.3,110.5,109.8,4.5],
-                                [116.3,110.5,109.8,4.5],
-                                [117,110.8,107.5,4.3],
-                                [117,110.8,107.5,4.3],
-                                [116.3,110.3,107.5,4.6],
-                                [116,106.7,108,4.2],
-                                [116,106.7,108,4.2],
-                                [113.7,108.1,105.5,4.5],
-                                [113.7,108.1,105.5,4.5],
-                                [115.9,106.8,106.6,4.7],
-                                [113.8,108.6,105.7,4.9],
-                                [116.4,108.6,105.7,4.8],
-                                [114.1,107.5,107.8,4.6],
-                                [114.1,107.5,107.8,4.6],
-                                [114.7,108.4,105.6,4.5],
-                                [111.3,108.1,105.4,4.1],
-                                [111.3,108.1,102.8,4.1],
-                                [112.5,105.7,103.9,4.4],
-                                [112.5,105.7,103.9,4.4],
-                                [111.1,106.5,103.5,4.2],
-                                [112,106,104,4.2],
-                                [112,106,104,4.2],
-                                [111.5,106.5,102.5,4.3],
-                                [111.5,106.5,102.5,4.3],
-                                [112.3,106.5,104.4,4.5],
-                                [112,107.1,104.7,4.5],
-                                [112,107.1,104.7,4.5],
-                                [113.9,107.5,104.6,4.4],
-                                [113.9,107.5,104.6,4.4],
-                                [110.9,105.3,101.9,4.5],
-                                [111.4,105.7,103.2,4.4],
-                                [111.4,105.7,103.2,4.4],
-                                [111.4,106.2,107.8,4.5],
-                                [111.4,106.2,102.7,4.5],
-                                [110.6,108.3,101.8,4.3],
-                                [109.6,105,102.6,4.7],
-                                [106.3,105,102.6,4.7],
-                                [111.3,105.2,102.5,4.6],
-                                [111.3,105.2,102.5,4.6],
-                                [110.1,101.8,102.5,4.7],
-                                [110.3,105.8,102,4.3],
-                                [110.3,101.9,102,4.3],
-                                [107.3,101.3,98.2,3.7],
-                                [107.3,101.3,102.7,4.8],
-                                [105.6,103.2,97.7,4.2],
-                                [107.4,103.7,100.8,4.4],
-                                [107.4,103.5,104.9,4.4],
-                                [103.5,100.1,100.8,4.2],
-                                [103.5,100.1,100.8,3.8],
-                                [113.6,113,105.4,5.1],
-                                [112.2,110.1,105.9,4.8],
-                                [112,111.9,111.2,4],
-                                [108.4,110.1,100.8,4.2],
-                                [114.3,110.3,105.9,4.2],
-                                [109.2,111.1,106.1,3.8],
-                                [112.7,105.7,105.4,3.9],
-                                [113.4,107.7,105.6,3.9],
-                                [112.6,107.6,105.6,3.6],
-                                [113.7,111.5,106,3.6],
-                                [115.3,111.5,104.5,3.8],
-                                [114.3,110.9,108.2,3.9],
-                                [120.4,114.1,107.2,3.9],
-                                [115,112.3,109.7,3.9],
-                                [120.2,117.6,109.7,5.1],
-                                [117.3,115.8,111.3,4.1],
-                                [115,112.5,108.9,3.8],
-                                [117.7,112.5,113.8,3.8],
-                                [119.3,115.6,110.3,3.9],
-                                [124.5,115.6,112.2,3.9],
-                                [121.3,118,114.5,3.8],
-                                [125.9,120.1,115.7,3.7],
-                                [125.9,120.9,119.7,3.7],
-                                [127.3,123,121.1,3.6],
-                                [129.8,123.6,121.3,3.6],
-                                [128.8,122.4,120.8,3.7],
-                                [127,123.4,121.4,3.6],
-                                [128.5,118.8,121.4,3.6],
-                                [129.4,124.4,122.3,3.5],
-                                [130.2,123.2,121.3,3.5],
-                                [134.5,128.9,129.2,3.4],
-                                [128.6,121,124.1,3.4],
-                                [133.1,126.8,128.1,2.9],
-                                [133.4,123.5,122,4],
-                                [137.9,125.3,127.2,4],
-                                [133.9,124.1,126.6,3.5],
-                                [133.3,129.6,126.6,2.9],
-                                [134.2,131.5,130.8,3.9],
-                                [135.9,135.3,129.7,3.9],
-                                [135.4,133.5,129.7,3.9],
-                                [138.9,134.4,128.5,3.4],
-                                [134.6,133.6,128.9,3.7],
-                                [134.5,129,129,3.7],
-                                [134.8,132,129.6,3.2],
-                                [140.3,135.5,130.4,4.1],
-                                [141.3,132.8,131.2,3.8],
-                                [137.8,130.3,129,3.8],
-                                [143.1,135.8,134,5.2],
-                                [138,129.8,127.6,4.2],
-                                [137.4,132.1,129.3,4.2],
-                                [139.7,132.6,125.3,3.8],
-                                [140.5,137.4,135,3],
-                                [143,140.3,136.3,4.1],
-                                [142.2,137.9,134.9,3.6],
-                                [144.5,136.9,135,3.6],
-                                [144.6,144.8,135.5,3.7],
-                                [142.8,138.9,134.4,3.7],
-                                [145.5,146.9,138.7,3.7],
-                                [145.3,141.8,138.7,4.2],
-                                [147.4,142.4,138.1,4.5],
-                                [143.7,143.4,136.9,3.5],
-                                [142,144.7,141.2,4.1],
-                                [151.1,149.6,135.9,3.8],
-                                [147.2,138.7,129.7,3.8],
-                                [150.8,144.8,139.8,3.8],
-                                [146.9,141.5,138.6,3.7],
-                                [157.3,153.7,140.5,3.7],
-                                [146.6,141.2,146.7,3.3],
-                                [147.3,142.6,141.1,3.8],
-                                [148.9,142.1,142.7,3.8],
-                                [147.2,139.6,140.7,3.5],
-                                [160.6,157.9,143.6,3.5],
-                                [155.6,149.2,143,3.6],
-                                [149.2,146.5,140.3,4],
-                                [156.5,159.6,139.5,4],
-                                [151.1,146.3,143.4,3.7],
-                                [146.7,142.1,143.7,3.7],
-                                [149.5,143.4,140.8,3.9],
-                                [145.2,138.3,135.6,3.6],
-                                [146.8,138.2,138.6,3.6],
-                                [148.4,140.4,137.6,3.5],
-                                [144.7,140.8,137.7,3.5],
-                                [145.5,142.1,138.4,3.9],
-                                [143.3,143.1,138.9,3.5],
-                                [151.5,143.6,140.8,3.5],
-                                [148,145.9,141.8,3.3],
-                                [148.3,146.7,144.7,3.3],
-                                [149.3,143.8,139.9,3.9],
-                                [149.2,144.9,140.1,3.4],
-                                [150,149.4,141.8,3.4],
-                                [147,143.3,137.9,3.6],
-                                [146.2,144.9,139,3.6],
-                                [148.8,146.1,138.9,3.7],
-                                [147.5,143,140.7,3.7],
-                                [149.9,143.5,136.1,3.7],
-                                [149.9,144.3,137.1,3.4],
-                                [146.2,144.2,137.3,3.4],
-                                [154,150.9,142.1,3.3],
-                                [147,143.3,141.3,3.3],
-                                [148.3,149.3,139.6,3.8],
-                                [149.4,146.8,140.5,3.5],
-                                [150.4,148,142.3,3.5],
-                                [149.3,144.9,142.4,3.7],
-                                [149.7,146.6,140.3,3.4],
-                                [147.1,146.6,140.2,4.3],
-                                [148.5,146.6,137.7,3.7],
-                                [145.6,142.9,138.6,3.7],
-                                [147,145.4,140.7,2.9],
-                                [148.4,145.4,141.1,2.8],
-                                [148.6,144.8,141.1,3.7],
-                                [143.5,139.8,137.4,3.4],
-                                [149,145.2,141.3,3.4],
-                                [149.3,150.8,141.8,3.9],
-                                [146.6,146.4,139.4,3.9],
-                                [149.5,146.4,142.4,3.8],
-                                [149.7,142.8,142.1,3.5],
-                                [149.7,146.6,142.1,3.8],
-                                [150,151.6,147.2,3.2],
-                                [150.6,147.1,142.8,4],
-                                [149.8,151.9,142,3.6],
-                                [150.2,149.1,142.5,3.6],
-                                [149.8,147.7,142.3,3.9],
-                                [150.5,150.2,147.1,3.9],
-                                [150.4,147.2,145.2,4.1],
-                                [146.9,146.6,142.9,4.1],
-                                [148.8,141.5,142.9,3.9],
-                                [147,146.6,142.9,3.9],
-                                [146.8,147.2,142.8,3.6],
-                                [144.7,142.4,138.6,3.5],
-                                [152.4,152.2,143.1,3.5],
-                                [153.2,152.4,148.2,4.5],
-                                [148.1,147.4,143.1,4.5],
-                                [148.3,147.5,142.7,3.8],
-                                [148.1,147.7,142.7,3.8],
-                                [148.4,147.2,142.9,3.7],
-                                [155.2,153,148.2,3.8],
-                                [148.4,147.7,143.3,3.8],
-                                [148.7,148.6,143.9,4.1],
-                                [159.1,152.7,154.2,4.2],
-                                [159.5,159.3,154.5,5.2],
-                                [161.6,159.6,155.1,5],
-                                [159.2,159.5,153.8,4.2],
-                                [159.2,159.3,149,4.3],
-                                [158.7,154.2,149.3,4.3],
-                                [164.4,159.3,154.6,4.5],
-                                [159.5,154.2,149,4.5],
-                                [164.7,154.2,154.5,4.5],
-                                [159.3,154.3,149.4,5],
-                                [159.4,154.3,149.4,5],
-                                [164.7,159.2,154.8,4.5],
-                                [159.7,155.8,152.2,4.2],
-                                [164.9,159,154.7,4.2],
-                                [165,159.1,155,5.6],
-                                [159.5,153.9,149.9,5.6],
-                                [164.6,155,155.3,5.3],
-                                [159.3,159.4,155.3,4.6],
-                                [159.5,155.8,155.2,5.5],
-                                [159.1,160.5,157,5.3],
-                                [164.5,160.5,159.9,4.5],
-                                [163.4,160.6,149.7,5.1],
-                                [164.4,160,155,5.6],
-                                [165.1,160,155,4.5],
-                                [160.1,160.3,154.7,5],
-                                [159.7,160.4,149.4,5],
-                                [164.7,160.3,154.6,4.3],
-                                [166.6,160.9,158.8,4.6],
-                                [164.7,155.2,159.9,4.6],
-                                [159.7,155.6,149.6,5.5],
-                                [159.3,155.4,154.7,4.5],
-                                [160.2,154.3,149.6,5.6],
-                                [158.8,155.5,148.2,5.1],
-                                [155.2,155.5,144.3,5.1],
-                                [158.9,155.6,155.1,5.3],
-                                [158.9,155.6,150,5.3],
-                                [155.5,155,150.1,5.6],
-                                [159.3,155.7,147.1,5.5],
-                                [155.8,149.6,147.1,5.5],
-                                [150.7,151.3,143.9,5],
-                                [150.8,144.5,139.5,5.5],
-                                [155.1,149.6,144.7,6.7],
-                                [153.6,147.7,143.1,5.4],
-                                [150.2,149.8,139.7,5.4],
-                                [149.6,149.7,140.8,5.1],
-                                [149.6,149.7,140.8,5.8],
-                                [155.3,150.1,143.4,5.8],
-                                [148.1,145,140.1,5.5],
-                                [145.7,145.4,140.9,4.8],
-                                [145.8,140.2,135.8,5.3],
-                                [145.8,140.2,135.8,4.9],
-                                [147.9,134.9,134,5.2],
-                                [144.2,138.2,134.9,5.3],
-                                [144.2,138.2,134.9,5.3],
-                                [145.7,140.8,135.5,4.9],
-                                [145.7,140.9,135.5,4.9],
-                                [147.6,145.9,136.7,6],
-                                [144,140.1,133.6,4.9],
-                                [144,140.6,133.6,4.9],
-                                [147,141.7,135.5,6],
-                                [147,141.7,130.4,5],
-                                [145.7,140.8,134.9,4.9],
-                                [139.6,135.5,128.2,4.9],
-                                [145.7,135.5,134.9,4.9],
-                                [140.7,134.3,131,5],
-                                [140.7,134.3,131,5],
-                                [135.7,129.5,124.8,5.1],
-                                [136.7,132.7,126,5.7],
-                                [136.7,135.6,126,5.7],
-                                [136.5,130.3,125.4,5.3],
-                                [135.9,130.3,125.4,6],
-                                [135.8,125.2,125.9,5],
-                                [135.2,130,128.3,5.8],
-                                [135.2,130,128.3,5],
-                                [134.1,129.4,126,5.3],
-                                [131.1,125.1,119.6,5.3]],columns = ['IA','IB','IV','IN'])
+def CurrentDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
+    dummy_day = pandas.DataFrame([[129.2, 122.5, 118.8, 4.7],
+                                  [126.3, 122.5, 118.8, 4.7],
+                                  [131.3, 123, 120.9, 5.6],
+                                  [126.9, 121.5, 117.8, 5],
+                                  [126.9, 121.5, 117.8, 5],
+                                  [125.4, 118.8, 116.6, 5],
+                                  [125.4, 118.8, 118.5, 4.6],
+                                  [124.8, 117.1, 116.6, 4.6],
+                                  [125.7, 118.8, 116.1, 5],
+                                  [125.7, 118.8, 113.5, 4.6],
+                                  [125.1, 117.4, 115, 4.5],
+                                  [125.1, 117.4, 115, 4.5],
+                                  [122.8, 115.3, 113.5, 4.7],
+                                  [122.4, 113.8, 114.7, 4.7],
+                                  [122.4, 113.8, 114.7, 4.7],
+                                  [120.9, 114.9, 111.5, 4.6],
+                                  [120.9, 111.9, 107.8, 4.6],
+                                  [120.2, 114.1, 107.8, 4.6],
+                                  [116.2, 114.1, 107.8, 4.6],
+                                  [119.1, 114.5, 108.3, 4.8],
+                                  [119.3, 112.2, 110.5, 4.9],
+                                  [116.3, 112.2, 110.5, 4.9],
+                                  [117.7, 110.7, 109.1, 4.6],
+                                  [117.7, 110.7, 109.1, 4.7],
+                                  [116.9, 109.4, 107.6, 4.7],
+                                  [116.3, 110.5, 109.8, 4.5],
+                                  [116.3, 110.5, 109.8, 4.5],
+                                  [117, 110.8, 107.5, 4.3],
+                                  [117, 110.8, 107.5, 4.3],
+                                  [116.3, 110.3, 107.5, 4.6],
+                                  [116, 106.7, 108, 4.2],
+                                  [116, 106.7, 108, 4.2],
+                                  [113.7, 108.1, 105.5, 4.5],
+                                  [113.7, 108.1, 105.5, 4.5],
+                                  [115.9, 106.8, 106.6, 4.7],
+                                  [113.8, 108.6, 105.7, 4.9],
+                                  [116.4, 108.6, 105.7, 4.8],
+                                  [114.1, 107.5, 107.8, 4.6],
+                                  [114.1, 107.5, 107.8, 4.6],
+                                  [114.7, 108.4, 105.6, 4.5],
+                                  [111.3, 108.1, 105.4, 4.1],
+                                  [111.3, 108.1, 102.8, 4.1],
+                                  [112.5, 105.7, 103.9, 4.4],
+                                  [112.5, 105.7, 103.9, 4.4],
+                                  [111.1, 106.5, 103.5, 4.2],
+                                  [112, 106, 104, 4.2],
+                                  [112, 106, 104, 4.2],
+                                  [111.5, 106.5, 102.5, 4.3],
+                                  [111.5, 106.5, 102.5, 4.3],
+                                  [112.3, 106.5, 104.4, 4.5],
+                                  [112, 107.1, 104.7, 4.5],
+                                  [112, 107.1, 104.7, 4.5],
+                                  [113.9, 107.5, 104.6, 4.4],
+                                  [113.9, 107.5, 104.6, 4.4],
+                                  [110.9, 105.3, 101.9, 4.5],
+                                  [111.4, 105.7, 103.2, 4.4],
+                                  [111.4, 105.7, 103.2, 4.4],
+                                  [111.4, 106.2, 107.8, 4.5],
+                                  [111.4, 106.2, 102.7, 4.5],
+                                  [110.6, 108.3, 101.8, 4.3],
+                                  [109.6, 105, 102.6, 4.7],
+                                  [106.3, 105, 102.6, 4.7],
+                                  [111.3, 105.2, 102.5, 4.6],
+                                  [111.3, 105.2, 102.5, 4.6],
+                                  [110.1, 101.8, 102.5, 4.7],
+                                  [110.3, 105.8, 102, 4.3],
+                                  [110.3, 101.9, 102, 4.3],
+                                  [107.3, 101.3, 98.2, 3.7],
+                                  [107.3, 101.3, 102.7, 4.8],
+                                  [105.6, 103.2, 97.7, 4.2],
+                                  [107.4, 103.7, 100.8, 4.4],
+                                  [107.4, 103.5, 104.9, 4.4],
+                                  [103.5, 100.1, 100.8, 4.2],
+                                  [103.5, 100.1, 100.8, 3.8],
+                                  [113.6, 113, 105.4, 5.1],
+                                  [112.2, 110.1, 105.9, 4.8],
+                                  [112, 111.9, 111.2, 4],
+                                  [108.4, 110.1, 100.8, 4.2],
+                                  [114.3, 110.3, 105.9, 4.2],
+                                  [109.2, 111.1, 106.1, 3.8],
+                                  [112.7, 105.7, 105.4, 3.9],
+                                  [113.4, 107.7, 105.6, 3.9],
+                                  [112.6, 107.6, 105.6, 3.6],
+                                  [113.7, 111.5, 106, 3.6],
+                                  [115.3, 111.5, 104.5, 3.8],
+                                  [114.3, 110.9, 108.2, 3.9],
+                                  [120.4, 114.1, 107.2, 3.9],
+                                  [115, 112.3, 109.7, 3.9],
+                                  [120.2, 117.6, 109.7, 5.1],
+                                  [117.3, 115.8, 111.3, 4.1],
+                                  [115, 112.5, 108.9, 3.8],
+                                  [117.7, 112.5, 113.8, 3.8],
+                                  [119.3, 115.6, 110.3, 3.9],
+                                  [124.5, 115.6, 112.2, 3.9],
+                                  [121.3, 118, 114.5, 3.8],
+                                  [125.9, 120.1, 115.7, 3.7],
+                                  [125.9, 120.9, 119.7, 3.7],
+                                  [127.3, 123, 121.1, 3.6],
+                                  [129.8, 123.6, 121.3, 3.6],
+                                  [128.8, 122.4, 120.8, 3.7],
+                                  [127, 123.4, 121.4, 3.6],
+                                  [128.5, 118.8, 121.4, 3.6],
+                                  [129.4, 124.4, 122.3, 3.5],
+                                  [130.2, 123.2, 121.3, 3.5],
+                                  [134.5, 128.9, 129.2, 3.4],
+                                  [128.6, 121, 124.1, 3.4],
+                                  [133.1, 126.8, 128.1, 2.9],
+                                  [133.4, 123.5, 122, 4],
+                                  [137.9, 125.3, 127.2, 4],
+                                  [133.9, 124.1, 126.6, 3.5],
+                                  [133.3, 129.6, 126.6, 2.9],
+                                  [134.2, 131.5, 130.8, 3.9],
+                                  [135.9, 135.3, 129.7, 3.9],
+                                  [135.4, 133.5, 129.7, 3.9],
+                                  [138.9, 134.4, 128.5, 3.4],
+                                  [134.6, 133.6, 128.9, 3.7],
+                                  [134.5, 129, 129, 3.7],
+                                  [134.8, 132, 129.6, 3.2],
+                                  [140.3, 135.5, 130.4, 4.1],
+                                  [141.3, 132.8, 131.2, 3.8],
+                                  [137.8, 130.3, 129, 3.8],
+                                  [143.1, 135.8, 134, 5.2],
+                                  [138, 129.8, 127.6, 4.2],
+                                  [137.4, 132.1, 129.3, 4.2],
+                                  [139.7, 132.6, 125.3, 3.8],
+                                  [140.5, 137.4, 135, 3],
+                                  [143, 140.3, 136.3, 4.1],
+                                  [142.2, 137.9, 134.9, 3.6],
+                                  [144.5, 136.9, 135, 3.6],
+                                  [144.6, 144.8, 135.5, 3.7],
+                                  [142.8, 138.9, 134.4, 3.7],
+                                  [145.5, 146.9, 138.7, 3.7],
+                                  [145.3, 141.8, 138.7, 4.2],
+                                  [147.4, 142.4, 138.1, 4.5],
+                                  [143.7, 143.4, 136.9, 3.5],
+                                  [142, 144.7, 141.2, 4.1],
+                                  [151.1, 149.6, 135.9, 3.8],
+                                  [147.2, 138.7, 129.7, 3.8],
+                                  [150.8, 144.8, 139.8, 3.8],
+                                  [146.9, 141.5, 138.6, 3.7],
+                                  [157.3, 153.7, 140.5, 3.7],
+                                  [146.6, 141.2, 146.7, 3.3],
+                                  [147.3, 142.6, 141.1, 3.8],
+                                  [148.9, 142.1, 142.7, 3.8],
+                                  [147.2, 139.6, 140.7, 3.5],
+                                  [160.6, 157.9, 143.6, 3.5],
+                                  [155.6, 149.2, 143, 3.6],
+                                  [149.2, 146.5, 140.3, 4],
+                                  [156.5, 159.6, 139.5, 4],
+                                  [151.1, 146.3, 143.4, 3.7],
+                                  [146.7, 142.1, 143.7, 3.7],
+                                  [149.5, 143.4, 140.8, 3.9],
+                                  [145.2, 138.3, 135.6, 3.6],
+                                  [146.8, 138.2, 138.6, 3.6],
+                                  [148.4, 140.4, 137.6, 3.5],
+                                  [144.7, 140.8, 137.7, 3.5],
+                                  [145.5, 142.1, 138.4, 3.9],
+                                  [143.3, 143.1, 138.9, 3.5],
+                                  [151.5, 143.6, 140.8, 3.5],
+                                  [148, 145.9, 141.8, 3.3],
+                                  [148.3, 146.7, 144.7, 3.3],
+                                  [149.3, 143.8, 139.9, 3.9],
+                                  [149.2, 144.9, 140.1, 3.4],
+                                  [150, 149.4, 141.8, 3.4],
+                                  [147, 143.3, 137.9, 3.6],
+                                  [146.2, 144.9, 139, 3.6],
+                                  [148.8, 146.1, 138.9, 3.7],
+                                  [147.5, 143, 140.7, 3.7],
+                                  [149.9, 143.5, 136.1, 3.7],
+                                  [149.9, 144.3, 137.1, 3.4],
+                                  [146.2, 144.2, 137.3, 3.4],
+                                  [154, 150.9, 142.1, 3.3],
+                                  [147, 143.3, 141.3, 3.3],
+                                  [148.3, 149.3, 139.6, 3.8],
+                                  [149.4, 146.8, 140.5, 3.5],
+                                  [150.4, 148, 142.3, 3.5],
+                                  [149.3, 144.9, 142.4, 3.7],
+                                  [149.7, 146.6, 140.3, 3.4],
+                                  [147.1, 146.6, 140.2, 4.3],
+                                  [148.5, 146.6, 137.7, 3.7],
+                                  [145.6, 142.9, 138.6, 3.7],
+                                  [147, 145.4, 140.7, 2.9],
+                                  [148.4, 145.4, 141.1, 2.8],
+                                  [148.6, 144.8, 141.1, 3.7],
+                                  [143.5, 139.8, 137.4, 3.4],
+                                  [149, 145.2, 141.3, 3.4],
+                                  [149.3, 150.8, 141.8, 3.9],
+                                  [146.6, 146.4, 139.4, 3.9],
+                                  [149.5, 146.4, 142.4, 3.8],
+                                  [149.7, 142.8, 142.1, 3.5],
+                                  [149.7, 146.6, 142.1, 3.8],
+                                  [150, 151.6, 147.2, 3.2],
+                                  [150.6, 147.1, 142.8, 4],
+                                  [149.8, 151.9, 142, 3.6],
+                                  [150.2, 149.1, 142.5, 3.6],
+                                  [149.8, 147.7, 142.3, 3.9],
+                                  [150.5, 150.2, 147.1, 3.9],
+                                  [150.4, 147.2, 145.2, 4.1],
+                                  [146.9, 146.6, 142.9, 4.1],
+                                  [148.8, 141.5, 142.9, 3.9],
+                                  [147, 146.6, 142.9, 3.9],
+                                  [146.8, 147.2, 142.8, 3.6],
+                                  [144.7, 142.4, 138.6, 3.5],
+                                  [152.4, 152.2, 143.1, 3.5],
+                                  [153.2, 152.4, 148.2, 4.5],
+                                  [148.1, 147.4, 143.1, 4.5],
+                                  [148.3, 147.5, 142.7, 3.8],
+                                  [148.1, 147.7, 142.7, 3.8],
+                                  [148.4, 147.2, 142.9, 3.7],
+                                  [155.2, 153, 148.2, 3.8],
+                                  [148.4, 147.7, 143.3, 3.8],
+                                  [148.7, 148.6, 143.9, 4.1],
+                                  [159.1, 152.7, 154.2, 4.2],
+                                  [159.5, 159.3, 154.5, 5.2],
+                                  [161.6, 159.6, 155.1, 5],
+                                  [159.2, 159.5, 153.8, 4.2],
+                                  [159.2, 159.3, 149, 4.3],
+                                  [158.7, 154.2, 149.3, 4.3],
+                                  [164.4, 159.3, 154.6, 4.5],
+                                  [159.5, 154.2, 149, 4.5],
+                                  [164.7, 154.2, 154.5, 4.5],
+                                  [159.3, 154.3, 149.4, 5],
+                                  [159.4, 154.3, 149.4, 5],
+                                  [164.7, 159.2, 154.8, 4.5],
+                                  [159.7, 155.8, 152.2, 4.2],
+                                  [164.9, 159, 154.7, 4.2],
+                                  [165, 159.1, 155, 5.6],
+                                  [159.5, 153.9, 149.9, 5.6],
+                                  [164.6, 155, 155.3, 5.3],
+                                  [159.3, 159.4, 155.3, 4.6],
+                                  [159.5, 155.8, 155.2, 5.5],
+                                  [159.1, 160.5, 157, 5.3],
+                                  [164.5, 160.5, 159.9, 4.5],
+                                  [163.4, 160.6, 149.7, 5.1],
+                                  [164.4, 160, 155, 5.6],
+                                  [165.1, 160, 155, 4.5],
+                                  [160.1, 160.3, 154.7, 5],
+                                  [159.7, 160.4, 149.4, 5],
+                                  [164.7, 160.3, 154.6, 4.3],
+                                  [166.6, 160.9, 158.8, 4.6],
+                                  [164.7, 155.2, 159.9, 4.6],
+                                  [159.7, 155.6, 149.6, 5.5],
+                                  [159.3, 155.4, 154.7, 4.5],
+                                  [160.2, 154.3, 149.6, 5.6],
+                                  [158.8, 155.5, 148.2, 5.1],
+                                  [155.2, 155.5, 144.3, 5.1],
+                                  [158.9, 155.6, 155.1, 5.3],
+                                  [158.9, 155.6, 150, 5.3],
+                                  [155.5, 155, 150.1, 5.6],
+                                  [159.3, 155.7, 147.1, 5.5],
+                                  [155.8, 149.6, 147.1, 5.5],
+                                  [150.7, 151.3, 143.9, 5],
+                                  [150.8, 144.5, 139.5, 5.5],
+                                  [155.1, 149.6, 144.7, 6.7],
+                                  [153.6, 147.7, 143.1, 5.4],
+                                  [150.2, 149.8, 139.7, 5.4],
+                                  [149.6, 149.7, 140.8, 5.1],
+                                  [149.6, 149.7, 140.8, 5.8],
+                                  [155.3, 150.1, 143.4, 5.8],
+                                  [148.1, 145, 140.1, 5.5],
+                                  [145.7, 145.4, 140.9, 4.8],
+                                  [145.8, 140.2, 135.8, 5.3],
+                                  [145.8, 140.2, 135.8, 4.9],
+                                  [147.9, 134.9, 134, 5.2],
+                                  [144.2, 138.2, 134.9, 5.3],
+                                  [144.2, 138.2, 134.9, 5.3],
+                                  [145.7, 140.8, 135.5, 4.9],
+                                  [145.7, 140.9, 135.5, 4.9],
+                                  [147.6, 145.9, 136.7, 6],
+                                  [144, 140.1, 133.6, 4.9],
+                                  [144, 140.6, 133.6, 4.9],
+                                  [147, 141.7, 135.5, 6],
+                                  [147, 141.7, 130.4, 5],
+                                  [145.7, 140.8, 134.9, 4.9],
+                                  [139.6, 135.5, 128.2, 4.9],
+                                  [145.7, 135.5, 134.9, 4.9],
+                                  [140.7, 134.3, 131, 5],
+                                  [140.7, 134.3, 131, 5],
+                                  [135.7, 129.5, 124.8, 5.1],
+                                  [136.7, 132.7, 126, 5.7],
+                                  [136.7, 135.6, 126, 5.7],
+                                  [136.5, 130.3, 125.4, 5.3],
+                                  [135.9, 130.3, 125.4, 6],
+                                  [135.8, 125.2, 125.9, 5],
+                                  [135.2, 130, 128.3, 5.8],
+                                  [135.2, 130, 128.3, 5],
+                                  [134.1, 129.4, 126, 5.3],
+                                  [131.1, 125.1, 119.6, 5.3]], columns=['IA', 'IB', 'IV', 'IN'])
 
-    
-    start_date_dt = datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
-     
-    dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
-    dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
+    start_date_dt = datetime(int(start_date.split("-")[0]), int(start_date.split("-")[1]),
+                             int(start_date.split("-")[2]))
+    end_date_dt = datetime(int(final_date.split("-")[0]), int(final_date.split("-")[1]), int(final_date.split("-")[2]))
+
+    dummy = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(5, 'm'), dtype='datetime64')
+    dummy = pandas.DataFrame(dummy, columns=['timestamp'])
     dummy.set_index('timestamp', inplace=True)
-    
-    
+
     aux_day = pandas.concat([dummy_day]*int(dummy.shape[0]/dummy_day.shape[0]), ignore_index=True)
-    
-    
-    cycles = 0.7*dummy.shape[0]/(365*24*12) # how many sine cycles
-    resolution = aux_day.shape[0] # how many datapoints to generate    
+
+    cycles = 0.7 * dummy.shape[0] / (365 * 24 * 12)  # how many sine cycles
+    resolution = aux_day.shape[0]  # how many datapoints to generate
     length = numpy.pi * 2 * cycles
     season_year = numpy.sin(numpy.arange(0, length, length / resolution))
 
-    cycles = 12*4*dummy.shape[0]/(365*24*12) # how many sine cycles
-    resolution = aux_day.shape[0] # how many datapoints to generate    
+    cycles = 12 * 4 * dummy.shape[0] / (365 * 24 * 12)  # how many sine cycles
+    resolution = aux_day.shape[0]  # how many datapoints to generate
     length = numpy.pi * 2 * cycles
     season_week = numpy.sin(numpy.arange(0, length, length / resolution))
 
-
-    cycles = 12*dummy.shape[0]/(365*24*12) # how many sine cycles
-    resolution = aux_day.shape[0] # how many datapoints to generate    
+    cycles = 12 * dummy.shape[0] / (365 * 24 * 12)  # how many sine cycles
+    resolution = aux_day.shape[0]  # how many datapoints to generate
     length = numpy.pi * 2 * cycles
     season_month = numpy.sin(numpy.arange(0, length, length / resolution))
-    
+
     rand_year = random.randint(5, 10)
     rand_month = random.randint(1, 5)
     rand_week = random.randint(1, 3)
-    
-    rand_vet = numpy.random.randint(5, 10,size=dummy.shape[0])
-    step_vet = numpy.zeros(dummy.shape[0])
-    
-    #Load transfer
-    for i in range(0,random.randint(1, 4)):
-        start = random.randint(0, dummy.shape[0])    
-        end = start+random.randint(1, 60)*24*12
-        
-        if(end>=len(step_vet)): end=len(step_vet)
-        
-        step_vet[start:end] = random.randint(-50,-20)
-        
-    #Noise
-    for i in range(0,random.randint(1, 40)):
-        start = random.randint(0, dummy.shape[0])    
-        end = start+random.randint(1,12*3)
-        
-        if(end>=len(step_vet)): end=len(step_vet)
-        
-        step_vet[start:end] = random.randint(-300,300)
 
-        
-    
-    dummy['IA'] = aux_day['IA'].values + rand_year*season_year + rand_month*season_month + rand_week*season_week + rand_vet + step_vet
-    dummy['IB'] = aux_day['IB'].values + rand_year*season_year + rand_month*season_month + rand_week*season_week + rand_vet + step_vet
-    dummy['IV'] = aux_day['IV'].values + rand_year*season_year + rand_month*season_month + rand_week*season_week + rand_vet + step_vet
-    dummy['IN'] = aux_day['IN'].values + (rand_year/10)*season_year + (rand_month/10)*season_month + (rand_week/10)*season_week + rand_vet/10
+    rand_vet = numpy.random.randint(5, 10, size=dummy.shape[0])
+    step_vet = numpy.zeros(dummy.shape[0])
+
+    # Load transfer
+    for i in range(0, random.randint(1, 4)):
+        start = random.randint(0, dummy.shape[0])
+        end = start + random.randint(1, 60) * 24 * 12
+
+        if end >= len(step_vet): end = len(step_vet)
+
+        step_vet[start:end] = random.randint(-50, -20)
+
+    # Noise
+    for i in range(0, random.randint(1, 40)):
+        start = random.randint(0, dummy.shape[0])
+        end = start + random.randint(1, 12 * 3)
+
+        if end >= len(step_vet): end = len(step_vet)
+
+        step_vet[start:end] = random.randint(-300, 300)
+
+    dummy['IA'] = aux_day['IA'].values + rand_year * season_year + rand_month * season_month \
+                                       + rand_week * season_week + rand_vet + step_vet
+    dummy['IB'] = aux_day['IB'].values + rand_year * season_year + rand_month * season_month \
+                                       + rand_week * season_week + rand_vet + step_vet
+    dummy['IV'] = aux_day['IV'].values + rand_year * season_year + rand_month * season_month \
+                                       + rand_week * season_week + rand_vet + step_vet
+    dummy['IN'] = aux_day['IN'].values + (rand_year / 10) * season_year \
+                                       + (rand_month / 10) * season_month + (rand_week / 10) \
+                                                           * season_week + rand_vet / 10
 
     return dummy
 
-def VoltageDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):    
-    
-    start_date_dt = datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
-     
-    dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
-    dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
+
+def VoltageDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
+    start_date_dt = datetime(int(start_date.split("-")[0]), int(start_date.split("-")[1]),
+                             int(start_date.split("-")[2]))
+    end_date_dt = datetime(int(final_date.split("-")[0]), int(final_date.split("-")[1]), int(final_date.split("-")[2]))
+
+    dummy = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(5, 'm'), dtype='datetime64')
+    dummy = pandas.DataFrame(dummy, columns=['timestamp'])
     dummy.set_index('timestamp', inplace=True)
-    
-    rand_vet = 0.05*13.8*numpy.random.rand(dummy.shape[0],1) - 0.025*13.8
-    
-    step_vet = numpy.zeros((dummy.shape[0],1))
-              
+
+    rand_vet = 0.05 * 13.8 * numpy.random.rand(dummy.shape[0], 1) - 0.025 * 13.8
+
+    step_vet = numpy.zeros((dummy.shape[0], 1))
+
     #Noise
     for i in range(0,random.randint(1, 40)):
-        start = random.randint(0, dummy.shape[0])    
+        start = random.randint(0, dummy.shape[0])
         end = start+random.randint(1,12*3)
-        
-        if(end>=len(step_vet)): end=len(step_vet)
-        
-        step_vet[start:end] = random.randint(-300,300)
-    
+
+        if end >= len(step_vet): end = len(step_vet)
+
+        step_vet[start:end] = random.randint(-300, 300)
+
     dummy['VA'] = 1.03*13.8 + rand_vet + step_vet
     dummy['VB'] = 1.03*13.8 + rand_vet + step_vet
     dummy['VV'] = 1.03*13.8 + rand_vet + step_vet
-    
+
     return dummy
 
-def PowerFactorDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):    
 
-    dummy_day = pandas.DataFrame([[0.85,0.88,0.9],
-                                    [0.86,0.88,0.9],
-                                    [0.84,0.88,0.89],
-                                    [0.86,0.88,0.9],
-                                    [0.86,0.88,0.9],
-                                    [0.87,0.9,0.91],
-                                    [0.87,0.9,0.9],
-                                    [0.87,0.91,0.91],
-                                    [0.86,0.9,0.91],
-                                    [0.86,0.9,0.92],
-                                    [0.87,0.9,0.92],
-                                    [0.87,0.9,0.92],
-                                    [0.88,0.91,0.92],
-                                    [0.88,0.92,0.92],
-                                    [0.88,0.92,0.92],
-                                    [0.89,0.92,0.93],
-                                    [0.89,0.93,0.95],
-                                    [0.89,0.92,0.95],
-                                    [0.91,0.92,0.95],
-                                    [0.9,0.92,0.95],
-                                    [0.9,0.93,0.94],
-                                    [0.91,0.93,0.94],
-                                    [0.9,0.94,0.94],
-                                    [0.9,0.94,0.94],
-                                    [0.91,0.94,0.95],
-                                    [0.91,0.94,0.94],
-                                    [0.91,0.94,0.94],
-                                    [0.91,0.94,0.95],
-                                    [0.91,0.94,0.95],
-                                    [0.91,0.94,0.95],
-                                    [0.91,0.96,0.95],
-                                    [0.91,0.96,0.95],
-                                    [0.92,0.95,0.96],
-                                    [0.92,0.95,0.96],
-                                    [0.91,0.96,0.96],
-                                    [0.92,0.95,0.96],
-                                    [0.91,0.95,0.96],
-                                    [0.92,0.95,0.95],
-                                    [0.92,0.95,0.95],
-                                    [0.92,0.95,0.96],
-                                    [0.93,0.95,0.96],
-                                    [0.93,0.95,0.98],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.96,0.97],
-                                    [0.94,0.96,0.97],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.96,0.98],
-                                    [0.93,0.96,0.98],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.95,0.97],
-                                    [0.93,0.95,0.97],
-                                    [0.92,0.95,0.97],
-                                    [0.92,0.95,0.97],
-                                    [0.94,0.96,0.98],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.96,0.97],
-                                    [0.93,0.96,0.95],
-                                    [0.93,0.96,0.98],
-                                    [0.94,0.95,0.98],
-                                    [0.94,0.96,0.98],
-                                    [0.96,0.96,0.98],
-                                    [0.93,0.96,0.98],
-                                    [0.93,0.96,0.98],
-                                    [0.94,0.98,0.98],
-                                    [0.94,0.96,0.98],
-                                    [0.94,0.98,0.98],
-                                    [0.95,0.98,1],
-                                    [0.95,0.98,0.98],
-                                    [0.96,0.97,1],
-                                    [0.95,0.97,0.99],
-                                    [0.95,0.97,0.97],
-                                    [0.97,0.99,0.99],
-                                    [0.97,0.99,0.99],
-                                    [0.92,0.93,0.96],
-                                    [0.93,0.94,0.96],
-                                    [0.93,0.93,0.93],
-                                    [0.95,0.94,0.99],
-                                    [0.92,0.94,0.96],
-                                    [0.94,0.94,0.96],
-                                    [0.93,0.96,0.96],
-                                    [0.92,0.95,0.96],
-                                    [0.93,0.95,0.96],
-                                    [0.92,0.93,0.96],
-                                    [0.91,0.93,0.97],
-                                    [0.92,0.94,0.95],
-                                    [0.89,0.92,0.95],
-                                    [0.92,0.93,0.94],
-                                    [0.89,0.9,0.94],
-                                    [0.91,0.91,0.93],
-                                    [0.92,0.93,0.95],
-                                    [0.9,0.93,0.92],
-                                    [0.9,0.91,0.94],
-                                    [0.87,0.91,0.93],
-                                    [0.89,0.9,0.92],
-                                    [0.86,0.89,0.91],
-                                    [0.86,0.89,0.89],
-                                    [0.86,0.88,0.89],
-                                    [0.84,0.87,0.89],
-                                    [0.85,0.88,0.89],
-                                    [0.86,0.88,0.89],
-                                    [0.85,0.9,0.89],
-                                    [0.85,0.87,0.88],
-                                    [0.84,0.88,0.89],
-                                    [0.82,0.85,0.85],
-                                    [0.85,0.89,0.87],
-                                    [0.83,0.86,0.85],
-                                    [0.83,0.88,0.88],
-                                    [0.81,0.87,0.86],
-                                    [0.82,0.87,0.86],
-                                    [0.83,0.85,0.86],
-                                    [0.82,0.84,0.84],
-                                    [0.82,0.82,0.85],
-                                    [0.82,0.83,0.85],
-                                    [0.8,0.82,0.85],
-                                    [0.82,0.83,0.85],
-                                    [0.82,0.85,0.85],
-                                    [0.82,0.83,0.85],
-                                    [0.79,0.82,0.84],
-                                    [0.79,0.83,0.84],
-                                    [0.81,0.84,0.85],
-                                    [0.78,0.82,0.82],
-                                    [0.81,0.84,0.86],
-                                    [0.81,0.83,0.85],
-                                    [0.8,0.83,0.87],
-                                    [0.79,0.81,0.82],
-                                    [0.78,0.79,0.81],
-                                    [0.78,0.81,0.82],
-                                    [0.77,0.81,0.82],
-                                    [0.77,0.77,0.82],
-                                    [0.78,0.8,0.82],
-                                    [0.77,0.76,0.8],
-                                    [0.77,0.79,0.8],
-                                    [0.76,0.78,0.8],
-                                    [0.78,0.78,0.81],
-                                    [0.79,0.77,0.79],
-                                    [0.74,0.75,0.82],
-                                    [0.76,0.8,0.85],
-                                    [0.74,0.77,0.8],
-                                    [0.76,0.79,0.8],
-                                    [0.71,0.73,0.79],
-                                    [0.76,0.79,0.76],
-                                    [0.76,0.78,0.79],
-                                    [0.75,0.79,0.78],
-                                    [0.76,0.8,0.79],
-                                    [0.7,0.71,0.78],
-                                    [0.72,0.75,0.78],
-                                    [0.75,0.76,0.79],
-                                    [0.72,0.7,0.8],
-                                    [0.74,0.76,0.78],
-                                    [0.76,0.79,0.78],
-                                    [0.75,0.78,0.79],
-                                    [0.77,0.8,0.82],
-                                    [0.76,0.8,0.8],
-                                    [0.75,0.79,0.81],
-                                    [0.77,0.79,0.81],
-                                    [0.77,0.79,0.8],
-                                    [0.78,0.78,0.8],
-                                    [0.74,0.78,0.79],
-                                    [0.76,0.77,0.79],
-                                    [0.76,0.76,0.77],
-                                    [0.75,0.78,0.8],
-                                    [0.75,0.77,0.79],
-                                    [0.75,0.75,0.79],
-                                    [0.76,0.78,0.81],
-                                    [0.77,0.77,0.8],
-                                    [0.75,0.77,0.8],
-                                    [0.76,0.78,0.79],
-                                    [0.75,0.78,0.81],
-                                    [0.75,0.77,0.81],
-                                    [0.77,0.78,0.81],
-                                    [0.73,0.74,0.79],
-                                    [0.76,0.78,0.79],
-                                    [0.76,0.75,0.8],
-                                    [0.75,0.76,0.79],
-                                    [0.75,0.76,0.78],
-                                    [0.75,0.77,0.78],
-                                    [0.75,0.76,0.79],
-                                    [0.76,0.76,0.79],
-                                    [0.75,0.76,0.81],
-                                    [0.77,0.78,0.8],
-                                    [0.76,0.77,0.79],
-                                    [0.75,0.77,0.79],
-                                    [0.75,0.77,0.79],
-                                    [0.78,0.8,0.81],
-                                    [0.75,0.77,0.79],
-                                    [0.75,0.74,0.79],
-                                    [0.76,0.76,0.8],
-                                    [0.75,0.76,0.78],
-                                    [0.75,0.78,0.79],
-                                    [0.75,0.76,0.79],
-                                    [0.75,0.74,0.76],
-                                    [0.74,0.76,0.78],
-                                    [0.75,0.74,0.79],
-                                    [0.75,0.75,0.78],
-                                    [0.75,0.76,0.78],
-                                    [0.74,0.75,0.76],
-                                    [0.75,0.76,0.77],
-                                    [0.76,0.76,0.78],
-                                    [0.75,0.79,0.78],
-                                    [0.76,0.76,0.78],
-                                    [0.76,0.76,0.78],
-                                    [0.77,0.78,0.8],
-                                    [0.74,0.74,0.78],
-                                    [0.73,0.74,0.76],
-                                    [0.76,0.76,0.78],
-                                    [0.76,0.76,0.78],
-                                    [0.76,0.76,0.78],
-                                    [0.75,0.76,0.78],
-                                    [0.72,0.73,0.76],
-                                    [0.75,0.76,0.78],
-                                    [0.75,0.75,0.78],
-                                    [0.7,0.73,0.73],
-                                    [0.7,0.7,0.73],
-                                    [0.69,0.7,0.72],
-                                    [0.7,0.7,0.73],
-                                    [0.7,0.7,0.75],
-                                    [0.7,0.73,0.75],
-                                    [0.68,0.7,0.72],
-                                    [0.7,0.73,0.75],
-                                    [0.68,0.73,0.73],
-                                    [0.7,0.73,0.75],
-                                    [0.7,0.73,0.75],
-                                    [0.68,0.7,0.72],
-                                    [0.7,0.72,0.74],
-                                    [0.67,0.7,0.72],
-                                    [0.67,0.7,0.72],
-                                    [0.7,0.73,0.75],
-                                    [0.68,0.72,0.72],
-                                    [0.7,0.7,0.72],
-                                    [0.7,0.72,0.72],
-                                    [0.7,0.7,0.71],
-                                    [0.68,0.7,0.7],
-                                    [0.68,0.7,0.75],
-                                    [0.68,0.7,0.72],
-                                    [0.67,0.7,0.72],
-                                    [0.7,0.7,0.72],
-                                    [0.7,0.7,0.75],
-                                    [0.68,0.7,0.72],
-                                    [0.67,0.69,0.7],
-                                    [0.68,0.72,0.7],
-                                    [0.7,0.72,0.75],
-                                    [0.7,0.72,0.72],
-                                    [0.7,0.73,0.75],
-                                    [0.7,0.72,0.76],
-                                    [0.72,0.72,0.77],
-                                    [0.7,0.72,0.72],
-                                    [0.7,0.72,0.75],
-                                    [0.72,0.72,0.75],
-                                    [0.7,0.72,0.76],
-                                    [0.72,0.75,0.76],
-                                    [0.74,0.74,0.78],
-                                    [0.74,0.77,0.8],
-                                    [0.72,0.75,0.77],
-                                    [0.73,0.76,0.78],
-                                    [0.75,0.75,0.8],
-                                    [0.75,0.75,0.79],
-                                    [0.75,0.75,0.79],
-                                    [0.72,0.75,0.78],
-                                    [0.76,0.77,0.79],
-                                    [0.77,0.77,0.79],
-                                    [0.77,0.79,0.82],
-                                    [0.77,0.79,0.82],
-                                    [0.76,0.82,0.82],
-                                    [0.78,0.8,0.82],
-                                    [0.78,0.8,0.82],
-                                    [0.77,0.79,0.82],
-                                    [0.77,0.79,0.82],
-                                    [0.76,0.77,0.81],
-                                    [0.78,0.79,0.83],
-                                    [0.78,0.79,0.83],
-                                    [0.76,0.79,0.82],
-                                    [0.76,0.79,0.84],
-                                    [0.77,0.79,0.82],
-                                    [0.8,0.82,0.85],
-                                    [0.77,0.82,0.82],
-                                    [0.79,0.82,0.84],
-                                    [0.79,0.82,0.84],
-                                    [0.82,0.85,0.87],
-                                    [0.81,0.83,0.86],
-                                    [0.81,0.82,0.86],
-                                    [0.81,0.84,0.87],
-                                    [0.82,0.84,0.87],
-                                    [0.82,0.87,0.86],
-                                    [0.82,0.84,0.85],
-                                    [0.82,0.84,0.85],
-                                    [0.82,0.85,0.86],
-                                    [0.84,0.87,0.89]],columns = ['FPA','FPB','FPV'])
-    
-    
-    start_date_dt = datetime(int(start_date.split("-")[0]),int(start_date.split("-")[1]),int(start_date.split("-")[2]))
-    end_date_dt = datetime(int(final_date.split("-")[0]),int(final_date.split("-")[1]),int(final_date.split("-")[2]))
-     
-    dummy = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(5,'m'), dtype='datetime64')
-    dummy = pandas.DataFrame(dummy,columns=['timestamp'])            
+def PowerFactorDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
+    dummy_day = pandas.DataFrame([[0.85, 0.88, 0.9],
+                                  [0.86, 0.88, 0.9],
+                                  [0.84, 0.88, 0.89],
+                                  [0.86, 0.88, 0.9],
+                                  [0.86, 0.88, 0.9],
+                                  [0.87, 0.9, 0.91],
+                                  [0.87, 0.9, 0.9],
+                                  [0.87, 0.91, 0.91],
+                                  [0.86, 0.9, 0.91],
+                                  [0.86, 0.9, 0.92],
+                                  [0.87, 0.9, 0.92],
+                                  [0.87, 0.9, 0.92],
+                                  [0.88, 0.91, 0.92],
+                                  [0.88, 0.92, 0.92],
+                                  [0.88, 0.92, 0.92],
+                                  [0.89, 0.92, 0.93],
+                                  [0.89, 0.93, 0.95],
+                                  [0.89, 0.92, 0.95],
+                                  [0.91, 0.92, 0.95],
+                                  [0.9, 0.92, 0.95],
+                                  [0.9, 0.93, 0.94],
+                                  [0.91, 0.93, 0.94],
+                                  [0.9, 0.94, 0.94],
+                                  [0.9, 0.94, 0.94],
+                                  [0.91, 0.94, 0.95],
+                                  [0.91, 0.94, 0.94],
+                                  [0.91, 0.94, 0.94],
+                                  [0.91, 0.94, 0.95],
+                                  [0.91, 0.94, 0.95],
+                                  [0.91, 0.94, 0.95],
+                                  [0.91, 0.96, 0.95],
+                                  [0.91, 0.96, 0.95],
+                                  [0.92, 0.95, 0.96],
+                                  [0.92, 0.95, 0.96],
+                                  [0.91, 0.96, 0.96],
+                                  [0.92, 0.95, 0.96],
+                                  [0.91, 0.95, 0.96],
+                                  [0.92, 0.95, 0.95],
+                                  [0.92, 0.95, 0.95],
+                                  [0.92, 0.95, 0.96],
+                                  [0.93, 0.95, 0.96],
+                                  [0.93, 0.95, 0.98],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.96, 0.97],
+                                  [0.94, 0.96, 0.97],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.96, 0.98],
+                                  [0.93, 0.96, 0.98],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.95, 0.97],
+                                  [0.93, 0.95, 0.97],
+                                  [0.92, 0.95, 0.97],
+                                  [0.92, 0.95, 0.97],
+                                  [0.94, 0.96, 0.98],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.96, 0.97],
+                                  [0.93, 0.96, 0.95],
+                                  [0.93, 0.96, 0.98],
+                                  [0.94, 0.95, 0.98],
+                                  [0.94, 0.96, 0.98],
+                                  [0.96, 0.96, 0.98],
+                                  [0.93, 0.96, 0.98],
+                                  [0.93, 0.96, 0.98],
+                                  [0.94, 0.98, 0.98],
+                                  [0.94, 0.96, 0.98],
+                                  [0.94, 0.98, 0.98],
+                                  [0.95, 0.98, 1],
+                                  [0.95, 0.98, 0.98],
+                                  [0.96, 0.97, 1],
+                                  [0.95, 0.97, 0.99],
+                                  [0.95, 0.97, 0.97],
+                                  [0.97, 0.99, 0.99],
+                                  [0.97, 0.99, 0.99],
+                                  [0.92, 0.93, 0.96],
+                                  [0.93, 0.94, 0.96],
+                                  [0.93, 0.93, 0.93],
+                                  [0.95, 0.94, 0.99],
+                                  [0.92, 0.94, 0.96],
+                                  [0.94, 0.94, 0.96],
+                                  [0.93, 0.96, 0.96],
+                                  [0.92, 0.95, 0.96],
+                                  [0.93, 0.95, 0.96],
+                                  [0.92, 0.93, 0.96],
+                                  [0.91, 0.93, 0.97],
+                                  [0.92, 0.94, 0.95],
+                                  [0.89, 0.92, 0.95],
+                                  [0.92, 0.93, 0.94],
+                                  [0.89, 0.9, 0.94],
+                                  [0.91, 0.91, 0.93],
+                                  [0.92, 0.93, 0.95],
+                                  [0.9, 0.93, 0.92],
+                                  [0.9, 0.91, 0.94],
+                                  [0.87, 0.91, 0.93],
+                                  [0.89, 0.9, 0.92],
+                                  [0.86, 0.89, 0.91],
+                                  [0.86, 0.89, 0.89],
+                                  [0.86, 0.88, 0.89],
+                                  [0.84, 0.87, 0.89],
+                                  [0.85, 0.88, 0.89],
+                                  [0.86, 0.88, 0.89],
+                                  [0.85, 0.9, 0.89],
+                                  [0.85, 0.87, 0.88],
+                                  [0.84, 0.88, 0.89],
+                                  [0.82, 0.85, 0.85],
+                                  [0.85, 0.89, 0.87],
+                                  [0.83, 0.86, 0.85],
+                                  [0.83, 0.88, 0.88],
+                                  [0.81, 0.87, 0.86],
+                                  [0.82, 0.87, 0.86],
+                                  [0.83, 0.85, 0.86],
+                                  [0.82, 0.84, 0.84],
+                                  [0.82, 0.82, 0.85],
+                                  [0.82, 0.83, 0.85],
+                                  [0.8, 0.82, 0.85],
+                                  [0.82, 0.83, 0.85],
+                                  [0.82, 0.85, 0.85],
+                                  [0.82, 0.83, 0.85],
+                                  [0.79, 0.82, 0.84],
+                                  [0.79, 0.83, 0.84],
+                                  [0.81, 0.84, 0.85],
+                                  [0.78, 0.82, 0.82],
+                                  [0.81, 0.84, 0.86],
+                                  [0.81, 0.83, 0.85],
+                                  [0.8, 0.83, 0.87],
+                                  [0.79, 0.81, 0.82],
+                                  [0.78, 0.79, 0.81],
+                                  [0.78, 0.81, 0.82],
+                                  [0.77, 0.81, 0.82],
+                                  [0.77, 0.77, 0.82],
+                                  [0.78, 0.8, 0.82],
+                                  [0.77, 0.76, 0.8],
+                                  [0.77, 0.79, 0.8],
+                                  [0.76, 0.78, 0.8],
+                                  [0.78, 0.78, 0.81],
+                                  [0.79, 0.77, 0.79],
+                                  [0.74, 0.75, 0.82],
+                                  [0.76, 0.8, 0.85],
+                                  [0.74, 0.77, 0.8],
+                                  [0.76, 0.79, 0.8],
+                                  [0.71, 0.73, 0.79],
+                                  [0.76, 0.79, 0.76],
+                                  [0.76, 0.78, 0.79],
+                                  [0.75, 0.79, 0.78],
+                                  [0.76, 0.8, 0.79],
+                                  [0.7, 0.71, 0.78],
+                                  [0.72, 0.75, 0.78],
+                                  [0.75, 0.76, 0.79],
+                                  [0.72, 0.7, 0.8],
+                                  [0.74, 0.76, 0.78],
+                                  [0.76, 0.79, 0.78],
+                                  [0.75, 0.78, 0.79],
+                                  [0.77, 0.8, 0.82],
+                                  [0.76, 0.8, 0.8],
+                                  [0.75, 0.79, 0.81],
+                                  [0.77, 0.79, 0.81],
+                                  [0.77, 0.79, 0.8],
+                                  [0.78, 0.78, 0.8],
+                                  [0.74, 0.78, 0.79],
+                                  [0.76, 0.77, 0.79],
+                                  [0.76, 0.76, 0.77],
+                                  [0.75, 0.78, 0.8],
+                                  [0.75, 0.77, 0.79],
+                                  [0.75, 0.75, 0.79],
+                                  [0.76, 0.78, 0.81],
+                                  [0.77, 0.77, 0.8],
+                                  [0.75, 0.77, 0.8],
+                                  [0.76, 0.78, 0.79],
+                                  [0.75, 0.78, 0.81],
+                                  [0.75, 0.77, 0.81],
+                                  [0.77, 0.78, 0.81],
+                                  [0.73, 0.74, 0.79],
+                                  [0.76, 0.78, 0.79],
+                                  [0.76, 0.75, 0.8],
+                                  [0.75, 0.76, 0.79],
+                                  [0.75, 0.76, 0.78],
+                                  [0.75, 0.77, 0.78],
+                                  [0.75, 0.76, 0.79],
+                                  [0.76, 0.76, 0.79],
+                                  [0.75, 0.76, 0.81],
+                                  [0.77, 0.78, 0.8],
+                                  [0.76, 0.77, 0.79],
+                                  [0.75, 0.77, 0.79],
+                                  [0.75, 0.77, 0.79],
+                                  [0.78, 0.8, 0.81],
+                                  [0.75, 0.77, 0.79],
+                                  [0.75, 0.74, 0.79],
+                                  [0.76, 0.76, 0.8],
+                                  [0.75, 0.76, 0.78],
+                                  [0.75, 0.78, 0.79],
+                                  [0.75, 0.76, 0.79],
+                                  [0.75, 0.74, 0.76],
+                                  [0.74, 0.76, 0.78],
+                                  [0.75, 0.74, 0.79],
+                                  [0.75, 0.75, 0.78],
+                                  [0.75, 0.76, 0.78],
+                                  [0.74, 0.75, 0.76],
+                                  [0.75, 0.76, 0.77],
+                                  [0.76, 0.76, 0.78],
+                                  [0.75, 0.79, 0.78],
+                                  [0.76, 0.76, 0.78],
+                                  [0.76, 0.76, 0.78],
+                                  [0.77, 0.78, 0.8],
+                                  [0.74, 0.74, 0.78],
+                                  [0.73, 0.74, 0.76],
+                                  [0.76, 0.76, 0.78],
+                                  [0.76, 0.76, 0.78],
+                                  [0.76, 0.76, 0.78],
+                                  [0.75, 0.76, 0.78],
+                                  [0.72, 0.73, 0.76],
+                                  [0.75, 0.76, 0.78],
+                                  [0.75, 0.75, 0.78],
+                                  [0.7, 0.73, 0.73],
+                                  [0.7, 0.7, 0.73],
+                                  [0.69, 0.7, 0.72],
+                                  [0.7, 0.7, 0.73],
+                                  [0.7, 0.7, 0.75],
+                                  [0.7, 0.73, 0.75],
+                                  [0.68, 0.7, 0.72],
+                                  [0.7, 0.73, 0.75],
+                                  [0.68, 0.73, 0.73],
+                                  [0.7, 0.73, 0.75],
+                                  [0.7, 0.73, 0.75],
+                                  [0.68, 0.7, 0.72],
+                                  [0.7, 0.72, 0.74],
+                                  [0.67, 0.7, 0.72],
+                                  [0.67, 0.7, 0.72],
+                                  [0.7, 0.73, 0.75],
+                                  [0.68, 0.72, 0.72],
+                                  [0.7, 0.7, 0.72],
+                                  [0.7, 0.72, 0.72],
+                                  [0.7, 0.7, 0.71],
+                                  [0.68, 0.7, 0.7],
+                                  [0.68, 0.7, 0.75],
+                                  [0.68, 0.7, 0.72],
+                                  [0.67, 0.7, 0.72],
+                                  [0.7, 0.7, 0.72],
+                                  [0.7, 0.7, 0.75],
+                                  [0.68, 0.7, 0.72],
+                                  [0.67, 0.69, 0.7],
+                                  [0.68, 0.72, 0.7],
+                                  [0.7, 0.72, 0.75],
+                                  [0.7, 0.72, 0.72],
+                                  [0.7, 0.73, 0.75],
+                                  [0.7, 0.72, 0.76],
+                                  [0.72, 0.72, 0.77],
+                                  [0.7, 0.72, 0.72],
+                                  [0.7, 0.72, 0.75],
+                                  [0.72, 0.72, 0.75],
+                                  [0.7, 0.72, 0.76],
+                                  [0.72, 0.75, 0.76],
+                                  [0.74, 0.74, 0.78],
+                                  [0.74, 0.77, 0.8],
+                                  [0.72, 0.75, 0.77],
+                                  [0.73, 0.76, 0.78],
+                                  [0.75, 0.75, 0.8],
+                                  [0.75, 0.75, 0.79],
+                                  [0.75, 0.75, 0.79],
+                                  [0.72, 0.75, 0.78],
+                                  [0.76, 0.77, 0.79],
+                                  [0.77, 0.77, 0.79],
+                                  [0.77, 0.79, 0.82],
+                                  [0.77, 0.79, 0.82],
+                                  [0.76, 0.82, 0.82],
+                                  [0.78, 0.8, 0.82],
+                                  [0.78, 0.8, 0.82],
+                                  [0.77, 0.79, 0.82],
+                                  [0.77, 0.79, 0.82],
+                                  [0.76, 0.77, 0.81],
+                                  [0.78, 0.79, 0.83],
+                                  [0.78, 0.79, 0.83],
+                                  [0.76, 0.79, 0.82],
+                                  [0.76, 0.79, 0.84],
+                                  [0.77, 0.79, 0.82],
+                                  [0.8, 0.82, 0.85],
+                                  [0.77, 0.82, 0.82],
+                                  [0.79, 0.82, 0.84],
+                                  [0.79, 0.82, 0.84],
+                                  [0.82, 0.85, 0.87],
+                                  [0.81, 0.83, 0.86],
+                                  [0.81, 0.82, 0.86],
+                                  [0.81, 0.84, 0.87],
+                                  [0.82, 0.84, 0.87],
+                                  [0.82, 0.87, 0.86],
+                                  [0.82, 0.84, 0.85],
+                                  [0.82, 0.84, 0.85],
+                                  [0.82, 0.85, 0.86],
+                                  [0.84, 0.87, 0.89]], columns=['FPA', 'FPB', 'FPV'])
+
+    start_date_dt = datetime(int(start_date.split("-")[0]), int(start_date.split("-")[1]),
+                             int(start_date.split("-")[2]))
+    end_date_dt = datetime(int(final_date.split("-")[0]), int(final_date.split("-")[1]), int(final_date.split("-")[2]))
+
+    dummy = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(5, 'm'), dtype='datetime64')
+    dummy = pandas.DataFrame(dummy, columns=['timestamp'])
     dummy.set_index('timestamp', inplace=True)
-    
-    
-    aux_day = pandas.concat([dummy_day]*int(dummy.shape[0]/dummy_day.shape[0]), ignore_index=True)
-    
-   
-    step_vet = numpy.zeros(dummy.shape[0])
-    
-    #Load transfer
-    for i in range(0,random.randint(1, 4)):
-        start = random.randint(0, dummy.shape[0])    
-        end = start+random.randint(1, 60)*24*12
-        
-        if(end>=len(step_vet)): end=len(step_vet)
-        
-        step_vet[start:end] = -0.2*random.random()
-        
-    #Noise
-    for i in range(0,random.randint(1, 40)):
-        start = random.randint(0, dummy.shape[0])    
-        end = start+random.randint(1,12*3)
-        
-        if(end>=len(step_vet)): end=len(step_vet)
-        
-        step_vet[start:end] = random.randint(-300,300)
 
-        
-    
+    aux_day = pandas.concat([dummy_day] * int(dummy.shape[0] / dummy_day.shape[0]), ignore_index=True)
+
+    step_vet = numpy.zeros(dummy.shape[0])
+
+    # Load transfer
+    for i in range(0, random.randint(1, 4)):
+        start = random.randint(0, dummy.shape[0])
+        end = start + random.randint(1, 60) * 24 * 12
+
+        if end >= len(step_vet): end = len(step_vet)
+
+        step_vet[start:end] = -0.2 * random.random()
+
+    # Noise
+    for i in range(0, random.randint(1, 40)):
+        start = random.randint(0, dummy.shape[0])
+        end = start + random.randint(1, 12 * 3)
+
+        if end >= len(step_vet): end = len(step_vet)
+
+        step_vet[start:end] = random.randint(-300, 300)
+
     dummy['FPA'] = aux_day['FPA'].values + step_vet
     dummy['FPB'] = aux_day['FPB'].values + step_vet
     dummy['FPV'] = aux_day['FPV'].values + step_vet    
-    
-    
+
     return dummy
 
-def PowerDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):
-    
-    
-    I = CurrentDummyData(start_date,final_date)
-    V = VoltageDummyData(start_date,final_date)
-    pf = PowerFactorDummyData(start_date,final_date)
-    
-    I = I.iloc[:,:-1]
-    
-    dummy = pandas.DataFrame([])    
-    
-    dummy['S'] = V['VA']/numpy.sqrt(3)*I['IA'] + V['VB']/numpy.sqrt(3)*I['IB'] + V['VV']/numpy.sqrt(3)*I['IV']
-    dummy['P'] = V['VA']/numpy.sqrt(3)*I['IA']*pf['FPA'] + V['VB']/numpy.sqrt(3)*I['IB']*pf['FPB'] + V['VV']/numpy.sqrt(3)*I['IV']*pf['FPV']
-    dummy['Q'] = dummy['S'].pow(2)-dummy['P'].pow(2)
+
+def PowerDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
+    I = CurrentDummyData(start_date, final_date)
+    V = VoltageDummyData(start_date, final_date)
+    pf = PowerFactorDummyData(start_date, final_date)
+
+    I = I.iloc[:, :-1]
+
+    dummy = pandas.DataFrame([])
+
+    dummy['S'] = V['VA'] / numpy.sqrt(3) * I['IA'] + V['VB'] / numpy.sqrt(3) * I['IB'] \
+                                                   + V['VV'] / numpy.sqrt(3) * I['IV']
+    dummy['P'] = V['VA'] / numpy.sqrt(3) * I['IA'] * pf['FPA'] + V['VB'] / numpy.sqrt(3) * I['IB'] * pf['FPB'] \
+                                                               + V['VV'] / numpy.sqrt(3) * I['IV'] * pf['FPV']
+    dummy['Q'] = dummy['S'].pow(2) - dummy['P'].pow(2)
     dummy['Q'] = numpy.sqrt(dummy['Q'])
-    
+
     return dummy
 
-def EnergyDummyData(start_date: str ='2021-01-01',final_date: str ='2023-01-01'):
-    
-    dummy_S = PowerDummyData(start_date,final_date)
-    
-    dummy = pandas.DataFrame([]) 
-    
-    dummy['Eactive'] = dummy_S['P'].cumsum(skipna=True)
-    
-    dummy['Ereactive'] = dummy_S['Q'].abs().cumsum(skipna=True)
-    
-    
-    
+
+def EnergyDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
+    dummy_s = PowerDummyData(start_date, final_date)
+
+    dummy = pandas.DataFrame([])
+
+    dummy['Eactive'] = dummy_s['P'].cumsum(skipna=True)
+
+    dummy['Ereactive'] = dummy_s['Q'].abs().cumsum(skipna=True)
+
     return dummy
 
 
 def ShowExample():
-    
-    
+
     data_inicio='2021-01-01'
     data_final='2023-01-01'
-    
-    start_date_dt = datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
-    end_date_dt = datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
-  
-    
+
+    start_date_dt = datetime(int(data_inicio.split("-")[0]), int(data_inicio.split("-")[1]),
+                             int(data_inicio.split("-")[2]))
+
+    end_date_dt = datetime(int(data_final.split("-")[0]), int(data_final.split("-")[1]),
+                           int(data_final.split("-")[2]))
+
     dummy = CurrentDummyData()
-    dummy.plot(title ="Current Input (with outliers [A]")
-    
-    
-    time_stopper = []    
-    time_stopper.append(['time_init',time.perf_counter()])    
-    output = DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')    
-    CountMissingData(output,show=True)    
-    time_stopper.append(['DataSynchronization',time.perf_counter()])    
-    output = RemoveOutliersHardThreshold(output,hard_max=500,hard_min=0)        
-    CountMissingData(output,show=True)
-    time_stopper.append(['RemoveOutliersHardThreshold',time.perf_counter()])    
-    output = RemoveOutliersMMADMM(output,len_mov_avg=3,std_def=4,plot=False,remove_from_process=['IN'])         
-    CountMissingData(output,show=True)
-    time_stopper.append(['RemoveOutliersMMADMM',time.perf_counter()])
-    output = RemoveOutliersQuantile(output)    
-    CountMissingData(output,show=True)
-    time_stopper.append(['RemoveOutliersQuantile',time.perf_counter()])
-    output = RemoveOutliersHistoGram(output,min_number_of_samples_limit=12*5)        
-    CountMissingData(output,show=True)
-    time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
-    
-    output.plot(title ="Current Output (no outliers) [A]")    
-    
- 
-    output = SimpleProcess(output,start_date_dt,end_date_dt,
-                      remove_from_process = ['IN'],
-                      sample_freq = 5,
-                      sample_time_base = 'm',
-                      pre_interpol = 1,
-                      pos_interpol = 6,
-                      prop_phases = True,
-                      integrate = True,
-                      interpol_integrate = 100)
-    
-    time_stopper.append(['SimpleProcessInput',time.perf_counter()])
-    CountMissingData(output,show=True)    
-    
-    output.plot(title ="Current Output (No missing data) [A]")
-    TimeProfile(time_stopper,name='Main',show=True,estimate_for=1000*5)
+    dummy.plot(title="Current Input (with outliers [A]")
+
+    time_stopper = []
+    time_stopper.append(['time_init', time.perf_counter()])
+    output = DataSynchronization(dummy, start_date_dt, end_date_dt, sample_freq=5, sample_time_base='m')
+    CountMissingData(output, show=True)
+    time_stopper.append(['DataSynchronization', time.perf_counter()])
+    output = RemoveOutliersHardThreshold(output, hard_max=500, hard_min=0)
+    CountMissingData(output, show=True)
+    time_stopper.append(['RemoveOutliersHardThreshold', time.perf_counter()])
+    output = RemoveOutliersMMADMM(output, len_mov_avg=3, std_def=4, plot=False, remove_from_process=['IN'])
+    CountMissingData(output, show=True)
+    time_stopper.append(['RemoveOutliersMMADMM', time.perf_counter()])
+    output = RemoveOutliersQuantile(output)
+    CountMissingData(output, show=True)
+    time_stopper.append(['RemoveOutliersQuantile', time.perf_counter()])
+    output = RemoveOutliersHistoGram(output, min_number_of_samples_limit=12 * 5)
+    CountMissingData(output, show=True)
+    time_stopper.append(['RemoveOutliersHistoGram', time.perf_counter()])
+
+    output.plot(title="Current Output (no outliers) [A]")
+
+    output = SimpleProcess(output, start_date_dt, end_date_dt,
+                           remove_from_process=['IN'],
+                           sample_freq=5,
+                           sample_time_base='m',
+                           pre_interpol=1,
+                           pos_interpol=6,
+                           prop_phases=True,
+                           integrate=True,
+                           interpol_integrate=100)
+
+    time_stopper.append(['SimpleProcessInput', time.perf_counter()])
+    CountMissingData(output, show=True)
+
+    output.plot(title="Current Output (No missing data) [A]")
+    TimeProfile(time_stopper, name='Main', show=True, estimate_for=1000 * 5)
     
     return

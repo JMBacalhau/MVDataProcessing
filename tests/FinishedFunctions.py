@@ -13,25 +13,25 @@ from datetime import datetime
 from itertools import permutations
 import random
 
-def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_for: int = 0):
+def TimeProfile(time_stopper: list, name: str = '', show: bool = False, estimate_for: int = 0):
     """
     Simple code profiler.
-    
+
     How to use:
-        
-    Create a list ->  time_stopper = []   
-    
+
+    Create a list ->  time_stopper = []
+
     Put a -> time_stopper.append(['time_init',time.perf_counter()]) at the beginning.
-    
-    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the fist parameter beeing a name and
-    the second beeing the time.
-    
+
+    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the fist parameter being
+    a name and the second being the time.
+
     Call this function at the end.
-    
+
     Example:
-    
+
     time_stopper.append(['time_init',time.perf_counter()])
-    
+
     func1()
     time_stopper.append(['func1',time.perf_counter()])
     func2()
@@ -40,220 +40,226 @@ def TimeProfile(time_stopper: list,name: str = '',show: bool = False,estimate_fo
     time_stopper.append(['func3',time.perf_counter()])
     func4()
     time_stopper.append(['func4',time.perf_counter()])
-     
+
     TimeProfile(time_stopper,'My Profiler',show=True,estimate_for=500)
-    
+
     The estimate_for parameter makes the calculation as if you would run x times the code analyzed.
-    
-    
+
+
     :param time_stopper: A List that will hold all the stop times.
     :type time_stopper: list
-    
+
     :param name: A name for this instance of time profile. Defaults to empty.
     :type name: str, optional
-    
+
     :param show: If True shows the data on the console. Defaults to False.
     :type show: bool, optional
-    
-    :param estimate_for: A multiplier to be applied at the end. Takes the whole time analized and multiplies by "estimate_for".
+
+    :param estimate_for: A multiplier to be applied at the end. Takes the whole
+    time analyzed and multiplies by "estimate_for".
     :type estimate_for: int
-    
+
     :return: None
     :rtype: None
-        
+
     """
-    
-    
-    if(show):
+
+    if show:
         print("Profile: " + name)
-        time_stopper = pandas.DataFrame(time_stopper,columns=['Type','time'])    
-        #time_stopper['time'] = time_stopper['time']-time_stopper['time'].min()    
-        time_stopper['Delta'] = time_stopper['time'] - time_stopper['time'].shift(periods=1, fill_value=0)    
-        time_stopper = time_stopper.iloc[1:,:]
-        time_stopper['%'] =  numpy.round(100*time_stopper['Delta']/time_stopper['Delta'].sum(),2)
+        time_stopper = pandas.DataFrame(time_stopper, columns=['Type', 'time'])
+        # time_stopper['time'] = time_stopper['time']-time_stopper['time'].min()
+        time_stopper['Delta'] = time_stopper['time'] - time_stopper['time'].shift(periods=1, fill_value=0)
+        time_stopper = time_stopper.iloc[1:, :]
+        time_stopper['%'] = numpy.round(100 * time_stopper['Delta'] / time_stopper['Delta'].sum(), 2)
         total_estimate = time_stopper['Delta'].sum()
-        time_stopper = pandas.concat((time_stopper,pandas.DataFrame([['Total',numpy.nan,time_stopper['Delta'].sum(),100]],columns=['Type','time','Delta','%'])))
+        time_stopper = pandas.concat((time_stopper,
+                                      pandas.DataFrame([['Total', numpy.nan, time_stopper['Delta'].sum(), 100]],
+                                                       columns=['Type', 'time', 'Delta', '%'])))
         print(time_stopper)
-        if(estimate_for!=0):
-            print(f"Estimation for {estimate_for} runs: {numpy.round(total_estimate*estimate_for/(60*60),2)} hours.")
+        if estimate_for != 0:
+            print(
+                f"Estimation for {estimate_for} "
+                f"runs: {numpy.round(total_estimate * estimate_for / (60 * 60), 2)} hours.")
 
     return
 
-#BUG Some sample_freq have trouble lol.
+
+# BUG Some sample_freq have trouble lol.
 def DataSynchronization(x_in: pandas.core.frame.DataFrame,
-              start_date_dt: datetime,
-              end_date_dt: datetime,
-              sample_freq: int = 5,
-              sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:        
+                        start_date_dt: datetime,
+                        end_date_dt: datetime,
+                        sample_freq: int = 5,
+                        sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
     """
     Makes the Data Synchronization between the columns (time series) of the data provided.
-    
+
     Theory background.:
-        
-    The time series synchronization is the first step in processing the dataset. The synchronization is vital 
+
+    The time series synchronization is the first step in processing the dataset. The synchronization is vital
     since the alignment between phases (φa, φb, φv) of the same quantity, between quantities (V, I, pf) of the
     same feeder, and between feeders, provides many advantages. The first one being the ability to combine all
     nine time series, the three-phase voltage, current, and power factor of each feeder to calculate the secondary
     quantities (Pactive/Preactive, Eactive/Ereactive).
-    
+
     Furthermore, the synchronization between feeders provides the capability to analyze the iteration between them,
     for instance, in load transfers for scheduled maintenance and to estimate substation’s transformers quantities
     by the sum of all feeders.
-         
-    Most of the fuctions in this module assumes that the time series are "Clean" to a certain sample_freq. Therefore,
-    this fuction must be executed first on the dataset.
-    
-    
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex" and each column contain an electrical
-    quantity time series.    
+
+    Most of the functions in this module assumes that the time series are "Clean" to a certain sample_freq. Therefore,
+    this function must be executed first on the dataset.
+
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetimes.DatetimeIndex"
+    and each column contain an electrical quantity time series.
     :type x_in: pandas.core.frame.DataFrame
-        
-    :param start_date_dt: The start date where the synchronization should start. 
+
+    :param start_date_dt: The start date where the synchronization should start.
     :type start_date_dt: datetime
-    
-    :param end_date_dt: The end date where the synchronization will consider samples.  
+
+    :param end_date_dt: The end date where the synchronization will consider samples.
     :type end_date_dt: datetime
-    
-    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.
     :type sample_freq: int,optional
-    
-    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes,
-    or (s)econds. Defaults to (m)inutes.  
+
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (D)ay,
+    (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds. Defaults to (m)inutes.
     :type sample_time_base: srt,optional
-    
-    
-    :raises Exception: if x_in has no DatetimeIndex. 
+
+
+    :raises Exception: if x_in has no DatetimeIndex.
     :raises Exception: if start_date_dt not in datetime format.
     :raises Exception: if end_date_dt not in datetime format.
     :raises Exception: if sample_time_base is not in (D)ay, (M)onth, (Y)ear, (h)ours, (m)inutes, or (s)econds.
-    
-    
+
+
     :return: Y: The synchronized pandas.core.frame.DataFrame
     :rtype: Y: pandas.core.frame.DataFrame
 
     """
-    
-    #-------------------#
-    # BASIC INPUT CHECK #
-    #-------------------#
-    
-    if not(isinstance(x_in.index, pandas.DatetimeIndex)):  raise Exception("x_in DataFrame has no DatetimeIndex.")
-    if not(isinstance(start_date_dt, datetime)):  raise Exception("start_date_dt Date not in datetime format.")
-    if not(isinstance(end_date_dt, datetime)):  raise Exception("end_date_dt Date not in datetime format.")
-    if sample_time_base not in ['s','m','h','D','M','Y']:  raise Exception("sample_time_base not valid. Ex. ['s','m','h','D','M','Y'] ")
-    
-    #-------------------#
-        
-    added_dic = {'s':'ms','m':'s','h':'m','D':'h','M':'D','Y':'M'}
-    floor_dic = {'s':'S','m':'T','h':'H','D':'D','M':'M','Y':'Y'}    
-        
-    x_in.index = x_in.index.tz_localize(None) #Makes the datetimeIndex naive (no time zone)
-    
-    #----------------------------------------------------------------#
-    #Creates a base vector that conntainXs all the samples between data_inicio and data_final filled timestamp and with nan
-    
+
+    #  BASIC INPUT CHECK
+
+    if not (isinstance(x_in.index, pandas.DatetimeIndex)): raise Exception("x_in DataFrame has no DatetimeIndex.")
+    if not (isinstance(start_date_dt, datetime)): raise Exception("start_date_dt Date not in datetime format.")
+    if not (isinstance(end_date_dt, datetime)): raise Exception("end_date_dt Date not in datetime format.")
+    if sample_time_base not in ['s', 'm', 'h', 'D', 'M', 'Y']: raise Exception(
+        "sample_time_base not valid. Ex. ['s','m','h','D','M','Y'] ")
+
+    added_dic = {'s': 'ms', 'm': 's', 'h': 'm', 'D': 'h', 'M': 'D', 'Y': 'M'}
+    floor_dic = {'s': 'S', 'm': 'T', 'h': 'H', 'D': 'D', 'M': 'M', 'Y': 'Y'}
+
+    x_in.index = x_in.index.tz_localize(None)  # Makes the datetimeIndex naive (no time zone)
+
+    '''
+    Creates a base vector that contains all the samples 
+    between start_date_dt and end_date_dt filled timestamp and with nan
+    '''
+
     qty_data = len(x_in.columns)
-               
-    timearray = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(sample_freq,sample_time_base), dtype='datetime64')
-    timearray = timearray + numpy.timedelta64(1,added_dic[sample_time_base]) # ADD a second/Minute/Hour/Day/Month to the end so during the sort 
-                                                                             # this samples will be at last (HH:MM:01)
-    
-    vet_amostras = pandas.DataFrame(index=timearray,columns=range(qty_data), dtype=object)
-    vet_amostras.index.name = 'timestamp'
-    
-        
-    #----------------------------------------------------------------#
-    #Creates the output dataframe which is the same but witohut the added second.
-       
-    Y = vet_amostras.copy(deep=True)    
-    Y.index = Y.index.floor(floor_dic[sample_time_base])#Flush the seconds    
-    
-    #----------------------------------------------------------------#
-    #Saves the name of the columns
-    save_columns_name = x_in.columns.values    
-    
-    #----------------------------------------------------------------#
-    #Start to process each column
-    
-    fase_list = numpy.arange(0,x_in.shape[1])   
-    
-    for fase in fase_list:                
-        
-        X = x_in.copy(deep=True)
-        X.columns = Y.columns
-        X = X.loc[~X.iloc[:,fase].isnull(),fase]#Gets only samples on the phase of interest                
-        X = X[numpy.logical_and(X.index<end_date_dt,X.index>=start_date_dt)]#Get samples on between the start and end of the period of study
-        
-        if(X.shape[0]!=0):            
-            
-            #Process samples that are multiple of sample_freq
-            df_X = X.copy(deep=True)
-            df_vet_amostras = vet_amostras[fase] 
-                        
-            #remove seconds (00:00:00) to put this specific samples at the beginning during sort
-            df_X = df_X.sort_index(ascending=True)#Ensures the sequence of timestamps
-            df_X.index = df_X.index.round('1'+floor_dic[sample_time_base])#Remove seconds, rounding to the nearest minute
-            df_X = df_X[df_X.index.minute % sample_freq == 0]#Samples that are multiple of sample_freq have preference 
-            
-            if(df_X.empty != True):
-                              
-                df_X = df_X[~df_X.index.duplicated(keep='first')]#Remove unecessary duplicates     
-               
-                #joins both vectors
-                df_aux = pandas.concat([df_X, df_vet_amostras])
-                df_aux = df_aux.sort_index(ascending=True)#Ensures the sequence of timestamps    
-                
-                #Elimina segundos (00:00:00), e elimina duplicatas deixando o X quando existente e vet_amostras quando não existe a amostra
+
+    time_array = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(sample_freq, sample_time_base),
+                              dtype='datetime64')
+    time_array = time_array + numpy.timedelta64(1, added_dic[
+        sample_time_base])  # ADD a second/Minute/Hour/Day/Month to the end so during the sort
+    # this samples will be at last (HH:MM:01)
+
+    vet_samples = pandas.DataFrame(index=time_array, columns=range(qty_data), dtype=object)
+    vet_samples.index.name = 'timestamp'
+
+    # Creates the output dataframe which is the same but without the added second.
+
+    df_y = vet_samples.copy(deep=True)
+    df_y.index = df_y.index.floor(floor_dic[sample_time_base])  # Flush the seconds
+
+    # Saves the name of the columns
+    save_columns_name = x_in.columns.values
+
+    # Start to process each column
+
+    phase_list = numpy.arange(0, x_in.shape[1])
+
+    for phase in phase_list:
+
+        x = x_in.copy(deep=True)
+        x.columns = df_y.columns
+        x = x.loc[~x.iloc[:, phase].isnull(), phase]  # Gets only samples on the phase of interest
+        x = x[numpy.logical_and(x.index < end_date_dt,
+                                x.index >= start_date_dt)]
+
+        if x.shape[0] != 0:
+
+            # Process samples that are multiple of sample_freq
+            df_x = x.copy(deep=True)
+            df_vet_samples = vet_samples[phase]
+
+            # remove seconds (00:00:00) to put this specific samples at the beginning during sort
+            df_x = df_x.sort_index(ascending=True)  # Ensures the sequence of timestamps
+            df_x.index = df_x.index.round(
+                '1' + floor_dic[sample_time_base])  # Remove seconds, rounding to the nearest minute
+            df_x = df_x[
+                df_x.index.minute % sample_freq == 0]  # Samples that are multiple of sample_freq have preference
+
+            if not df_x.empty:
+                df_x = df_x[~df_x.index.duplicated(keep='first')]  # Remove unnecessary duplicates
+
+                # joins both vectors
+                df_aux = pandas.concat([df_x, df_vet_samples])
+                df_aux = df_aux.sort_index(ascending=True)  # Ensures the sequence of timestamps
+
+                '''
+                Remove sec. (00:00:00), and remove duplicates leaving X when there is data 
+                and vet amostra where its empty
+                '''
                 df_aux.index = df_aux.index.floor(floor_dic[sample_time_base])
-                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]#Remove unecessary duplicates     
-                
-                #Make sure that any round up that ended up out of the period of study is removed
-                df_aux = df_aux[numpy.logical_and(df_aux.index<end_date_dt,df_aux.index>=start_date_dt)]
-                
-                Y.loc[:,fase] = df_aux
-                
-                
-                
-            #Process samples that are NOT multiple of sample_freq
-            df_X = X.copy(deep=True)
-            df_vet_amostras = vet_amostras[fase]                               
-                            
-            #remove seconds (00:00:00) to put this specific samples at the beginning during sort
-            df_X = df_X.sort_index(ascending=True)#Ensures the sequence of timestamps
-            df_X.index = df_X.index.round('1'+floor_dic[sample_time_base])#Remove seconds, rounding to the nearest minute
-            df_X = df_X[df_X.index.minute % sample_freq != 0]#Samples that are NOT multiple of sample_freq have preference 
-                            
-            
-            if(df_X.empty != True):
-               
-                                               
-                df_X.index = df_X.index.round(str(sample_freq)+floor_dic[sample_time_base])#Aproximate sample to the closest multiple of sample_freq
-                
-                df_X = df_X[~df_X.index.duplicated(keep='first')]#Remove unecessary duplicates     
-               
-                #joins both vectors
-                df_aux = pandas.concat([df_X, df_vet_amostras])
-                df_aux = df_aux.sort_index(ascending=True)#Ensures the sequence of timestamps                
-                
-                #Remove seconds (00:00:00), and remove ducplicates leaving X when there is data and vet amostra when its empty
+                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]  # Remove unnecessary duplicates
+
+                # Make sure that any round up that ended up out of the period of study is removed
+                df_aux = df_aux[numpy.logical_and(df_aux.index < end_date_dt, df_aux.index >= start_date_dt)]
+
+                df_y.loc[:, phase] = df_aux
+
+            # Process samples that are NOT multiple of sample_freq
+            df_x = x.copy(deep=True)
+            df_vet_samples = vet_samples[phase]
+
+            # remove seconds (00:00:00) to put this specific samples at the beginning during sort
+            df_x = df_x.sort_index(ascending=True)  # Ensures the sequence of timestamps
+            df_x.index = df_x.index.round(
+                '1' + floor_dic[sample_time_base])  # Remove seconds, rounding to the nearest minute
+            df_x = df_x[
+                df_x.index.minute % sample_freq != 0]  # Samples that are NOT multiple of sample_freq have preference
+
+            if not df_x.empty:
+                df_x.index = df_x.index.round(str(sample_freq) + floor_dic[
+                    sample_time_base])  # Approximate sample to the closest multiple of sample_freq
+
+                df_x = df_x[~df_x.index.duplicated(keep='first')]  # Remove unnecessary duplicates
+
+                # joins both vectors
+                df_aux = pandas.concat([df_x, df_vet_samples])
+                df_aux = df_aux.sort_index(ascending=True)  # Ensures the sequence of timestamps
+
+                '''
+                Remove sec. (00:00:00), and remove duplicates leaving X when there is data 
+                and vet amostra where its empty
+                '''
                 df_aux.index = df_aux.index.floor(floor_dic[sample_time_base])
-                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]#Remove unecessary duplicates     
-                
-                
-                #Make sure that any round up that ended up out of the period of study is removed
-                df_aux = df_aux[numpy.logical_and(df_aux.index<end_date_dt,df_aux.index>=start_date_dt)]
-                                                
-                #Copy data to the output vecto olny if there not data there yet.
-                Y.loc[Y.iloc[:,fase].isnull(),fase] = df_aux.loc[Y.iloc[:,fase].isnull()]
-    
-    
-    #----------------------------------------------------------------#
-    #Last operations before the return of Y
-    
-    Y = Y.astype(float)    
-    Y.columns = save_columns_name# Gives back the original name of the columns in x_in
-    
-    return Y
+                df_aux = df_aux[~df_aux.index.duplicated(keep='first')]  # Remove unnecessary duplicates
+
+                # Make sure that any round up that ended up out of the period of study is removed
+                df_aux = df_aux[numpy.logical_and(df_aux.index < end_date_dt, df_aux.index >= start_date_dt)]
+
+                # Copy data to the output vector only if there is no data there yet.
+                df_y.loc[df_y.iloc[:, phase].isnull(), phase] = df_aux.loc[df_y.iloc[:, phase].isnull()]
+
+    # Last operations before the return of Y
+
+    df_y = df_y.astype(float)
+    df_y.columns = save_columns_name  # Gives back the original name of the columns in x_in
+
+    return df_y
+
 
 def IntegrateHour(x_in: pandas.DataFrame,sample_freq: int = 5,sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
     """

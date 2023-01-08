@@ -313,7 +313,7 @@ if __name__ == "__main__":
     logger.addHandler(cmd_handler)
     logger.info("Example:")
 
-  
+
     
     
     data_inicio='2021-01-01'

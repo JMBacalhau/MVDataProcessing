@@ -28,7 +28,7 @@ import numpy as np
 import numpy
 from datetime import datetime
 import FinishedFunctions as f_remove
-
+import matplotlib.pyplot as plt
 
 #pd.set_option('display.max_rows', None)
 #pd.set_option('display.max_columns', None)
@@ -316,8 +316,8 @@ if __name__ == "__main__":
 
     
     
-    data_inicio='2021-01-01'
-    data_final='2022-03-01'
+    data_inicio='2021-12-15'
+    data_final='2023-01-15'
     
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
@@ -367,7 +367,10 @@ if __name__ == "__main__":
     time_stopper.append(['time_init',time.perf_counter()])
     output = f_remove.DataSynchronization(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     
-    output.plot(title='Input')
+
+    fig, ax = plt.subplots()
+    ax.plot(output.values)
+    ax.set_title('Input')
     
     f_remove.CountMissingData(output,show=True)    
     time_stopper.append(['DataSynchronization',time.perf_counter()])    
@@ -405,8 +408,10 @@ if __name__ == "__main__":
     X_pred = GetNSSCPedrictedSamples(output,max_vet,min_vet,weekday_curve,sample_freq= 5,sample_time_base = 'm',remove_from_process = [])       
     time_stopper.append(['NSSC',time.perf_counter()])
     
-    X_pred.plot(title='X_pred')
-    
+
+    fig, ax = plt.subplots()
+    ax.plot(X_pred.values)
+    ax.set_title('X_pred')
     
     
     #Criarr as regras para substituir X_pred no vetor x_in
@@ -504,11 +509,13 @@ if __name__ == "__main__":
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportonInput',time.perf_counter()])
     '''
-    
-    
-    
-    output.plot(title='Output')
-    
+
+    fig, ax = plt.subplots()
+    ax.plot(output.values)
+    ax.set_title('Output')
+
+    plt.show()
+
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
     #TESTED - OK #output = CalcUnbalance(dummy)
     #TESTED - OK #output = RemoveOutliersQuantile(dummy,col_names = [],drop=False)

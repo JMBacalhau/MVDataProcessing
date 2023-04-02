@@ -3,21 +3,12 @@ Created on Mon Apr 18 06:45:44 2022
 
 @author: Bacalhau
 
-Part1
-
 
 Part2
-1) Input
-
-
-Part3
-
-1) Publish
-
-Part4
-
-1) Test on 2021 dataset
-
+1) Solve the input
+2) Tailor the example
+3) Format to publish
+4) Test on 2022 data
 
 """
 
@@ -392,9 +383,9 @@ if __name__ == "__main__":
     output.plot(title='No outliers')
     
     
-    output = f_remove.PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
+    output = f_remove.PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
-    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    time_stopper.append(['PhaseProportionInput',time.perf_counter()])
     
     
     
@@ -507,7 +498,7 @@ if __name__ == "__main__":
     output = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
   
     f_remove.CountMissingData(output,show=True)
-    time_stopper.append(['PhaseProportonInput',time.perf_counter()])
+    time_stopper.append(['PhaseProportionInput',time.perf_counter()])
     '''
 
     fig, ax = plt.subplots()
@@ -516,17 +507,17 @@ if __name__ == "__main__":
 
     plt.show()
 
-    #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)    
+    #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)
     #TESTED - OK #output = CalcUnbalance(dummy)
     #TESTED - OK #output = RemoveOutliersQuantile(dummy,col_names = [],drop=False)
-    #TESTED - OK #output = RemoveOutliersHistoGram(dummy,df_avoid_periods = dummy_manobra,min_number_of_samples_limit=12)    
-    #TESTED - OK #output = RemoveOutliersHardThreshold(dummy,hard_max=13.80,hard_min=0,df_avoid_periods = dummy_manobra)    
-    #TESTED - OK #output,index = SavePeriod(dummy,dummy_manobra)    
+    #TESTED - OK #output = RemoveOutliersHistoGram(dummy,df_avoid_periods = dummy_manobra,min_number_of_samples_limit=12)
+    #TESTED - OK #output = RemoveOutliersHardThreshold(dummy,hard_max=13.80,hard_min=0,df_avoid_periods = dummy_manobra)
+    #TESTED - OK #output,index = SavePeriod(dummy,dummy_manobra)
     #TESTED - OK #dummy = DataClean(dummy,start_date_dt,end_date_dt,sample_freq= 5,sample_time_base='m')
     #TESTED - OK #output = ReturnOnlyValidDays(dummy,sample_freq = 5,threshold_accept = 1.0,sample_time_base = 'm')
     #TESTED - OK #output = GetDayMaxMin(dummy,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 1.0,exe_param='max')
     #TESTED - OK #output = MarkNanPeriod(dummy,dummy_manobra)
-    #TESTED - OK #output = PhaseProportonInput(output,threshold_accept = 0.60,remove_from_process=['IN'])    
+    #TESTED - OK #output = PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     
     
     #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)

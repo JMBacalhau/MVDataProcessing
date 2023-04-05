@@ -157,10 +157,15 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
     vet_idx = pd.merge(vet_idx, Y, left_index=True, right_index=True, how='right',suffixes = ['','_remove'])
     vet_idx.drop(columns=vet_idx.columns[vet_idx.columns.str.contains('_remove')], axis=1,inplace=True)
 
+    # Missing days get midnight as the  hour of max and min
     for col in vet_idx.columns.values:
          vet_idx.loc[vet_idx[col].isna(),col] = vet_idx.index[vet_idx[col].isna()]
 
-    #Y = Y.interpolate(method_type='linear')
+    # Interpolate by day of the week
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.interpolate())
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.ffill())
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.bfill())
+
     
     return Y, vet_idx
 
@@ -404,27 +409,24 @@ if __name__ == "__main__":
     
     output.iloc[50000:60000,:] = np.nan
 
+    output.iloc[:10000, :] = np.nan
+
     X, _ = ReturnOnlyValidDays(output, sample_freq=5, threshold_accept=0.2)
 
 
     max_vet,max_vet_idx = GetDayMaxMin(output, start_date_dt, end_date_dt, sample_freq=5, threshold_accept=0.2, exe_param='max')
 
-
-
-
-
     fig, ax = plt.subplots()
     ax.plot(output.index.values,output.values)
-    ax.scatter(max_vet_idx['IA'].values, max_vet['IA'].values)
+    ax.scatter(max_vet_idx['IN'].values, max_vet['IN'].values)
     ax.set_title('No outliers')
     plt.show()
-
 
     '''
     output = f_remove.PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportionInput',time.perf_counter()])
-    
+
     
     
     #NSSC Implementation    

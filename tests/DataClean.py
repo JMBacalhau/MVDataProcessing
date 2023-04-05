@@ -5,8 +5,9 @@ Created on Mon Apr 18 06:45:44 2022
 
 
 Part2
+0) Test Previous function
 1) Solve the input
-2) Tailor the example
+2) Tailor the example maybe put data on a pickle file
 3) Format to publish
 4) Test on 2022 data
 
@@ -55,7 +56,7 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
     
          
     :raises Exception: if x_in has no DatetimeIndex. 
-    :raises Exception: if sample_time_base is is not in seconds, minutes or hours.
+    :raises Exception: if sample_time_base is not in seconds, minutes or hours.
     
     
     :return: Y: The pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
@@ -128,19 +129,40 @@ def GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept
         
     if(exe_param=='max'):
         Y = X.groupby([X.index.year,X.index.month,X.index.day]).max()
+        vet_idx = X.groupby([X.index.year, X.index.month, X.index.day]).idxmax()
     else:
         Y = X.groupby([X.index.year,X.index.month,X.index.day]).min()
-        
-    time_vet_stamp = X.index[np.arange(0,len(X.index),int(24*60/sample_freq))]     
-    Y = Y.reset_index(drop=True)    
+        vet_idx = X.groupby([X.index.year, X.index.month, X.index.day]).idxmin()
+
+    # redo the timestamp index
+    vet_idx.index.rename(['Year', 'Month','Day'], inplace=True)
+    vet_idx = vet_idx.reset_index(drop=False)
+    time_vet_stamp = pd.to_datetime(vet_idx['Year'].astype(str) + '-' + vet_idx['Month'].astype(str) + '-' + vet_idx['Day'].astype(str))
+    vet_idx.drop(columns=['Year', 'Month','Day'],axis=1,inplace=True)
+    vet_idx = vet_idx.reset_index(drop=True)
+    vet_idx.insert(0,'timestamp_day', time_vet_stamp)
+    vet_idx.set_index('timestamp_day', inplace=True)
+
+    # redo the timestamp index
+    Y.index.rename(['Year', 'Month','Day'], inplace=True)
+    Y = Y.reset_index(drop=False)
+    time_vet_stamp = pd.to_datetime(Y['Year'].astype(str) + '-' + Y['Month'].astype(str) + '-' + Y['Day'].astype(str))
+    Y.drop(columns=['Year', 'Month','Day'],axis=1,inplace=True)
+    Y = Y.reset_index(drop=True)
     Y.insert(0,'timestamp_day', time_vet_stamp)
-    Y.set_index('timestamp_day', inplace=True)    
-    
+    Y.set_index('timestamp_day', inplace=True)
+
     Y = f_remove.DataSynchronization(Y, start_date_dt, end_date_dt,sample_freq = 1,sample_time_base='D')
+
+    vet_idx = pd.merge(vet_idx, Y, left_index=True, right_index=True, how='right',suffixes = ['','_remove'])
+    vet_idx.drop(columns=vet_idx.columns[vet_idx.columns.str.contains('_remove')], axis=1,inplace=True)
+
+    for col in vet_idx.columns.values:
+         vet_idx.loc[vet_idx[col].isna(),col] = vet_idx.index[vet_idx[col].isna()]
+
+    #Y = Y.interpolate(method_type='linear')
     
-    Y = Y.interpolate(method_type='linear')    
-    
-    return Y
+    return Y, vet_idx
 
 def GetWeekDayCurve(x_in,sample_freq = 5,threshold_accept = 1.0,min_sample_per_day = 3,min_sample_per_workday = 9):
     """
@@ -313,7 +335,7 @@ if __name__ == "__main__":
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
  
-        
+    '''    
     dummy = np.arange(start_date_dt, end_date_dt,np.timedelta64(5,'m'), dtype='datetime64')
     dummy = dummy + np.timedelta64(random.randint(0, 59),'s') # ADD a second to the end so during the sort this samples will be at last (HH:MM:01)   
         
@@ -339,7 +361,9 @@ if __name__ == "__main__":
     
     time_init = time.perf_counter()    
     
-    
+    '''
+
+
     #TESTE
     dummy = pd.read_csv('CALADJ2074_I.csv',names=['timestamp_aux','IA', 'IB', 'IV','IN'],skiprows=1,parse_dates=True)
     dummy.insert(loc=0, column='timestamp', value=pd.to_datetime(dummy.timestamp_aux.astype(str)))
@@ -379,10 +403,24 @@ if __name__ == "__main__":
     time_stopper.append(['RemoveOutliersHistoGram',time.perf_counter()])
     
     output.iloc[50000:60000,:] = np.nan
-       
-    output.plot(title='No outliers')
-    
-    
+
+    X, _ = ReturnOnlyValidDays(output, sample_freq=5, threshold_accept=0.2)
+
+
+    max_vet,max_vet_idx = GetDayMaxMin(output, start_date_dt, end_date_dt, sample_freq=5, threshold_accept=0.2, exe_param='max')
+
+
+
+
+
+    fig, ax = plt.subplots()
+    ax.plot(output.index.values,output.values)
+    ax.scatter(max_vet_idx['IA'].values, max_vet['IA'].values)
+    ax.set_title('No outliers')
+    plt.show()
+
+
+    '''
     output = f_remove.PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportionInput',time.perf_counter()])
@@ -494,18 +532,21 @@ if __name__ == "__main__":
     
     
     #Simple Process
-    '''
+   
     output = f_remove.SimpleProcess(output,start_date_dt,end_date_dt,remove_from_process= ['IN'],sample_freq= 5,sample_time_base = 'm',pre_interpol = 12,pos_interpol = 12,prop_phases = True, integrate = False, interpol_integrate = 3)
   
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportionInput',time.perf_counter()])
-    '''
+   
 
     fig, ax = plt.subplots()
     ax.plot(output.values)
     ax.set_title('Output')
 
-    plt.show()
+
+
+    '''
+
 
     #TESTED - OK #output = RemoveOutliersMMADMM(dummy,df_avoid_periods = dummy_manobra)
     #TESTED - OK #output = CalcUnbalance(dummy)

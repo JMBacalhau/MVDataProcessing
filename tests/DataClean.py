@@ -6,7 +6,6 @@ Created on Mon Apr 18 06:45:44 2022
 
 Part2
 0) Test Previous functions
-1) Still need to finish GetWeekDayCurve. Se comment.
 2) Tailor the example maybe put data on a pickle file
 3) Format to publish
 4) Test on 2022 data
@@ -21,6 +20,7 @@ import numpy
 from datetime import datetime
 import FinishedFunctions as f_remove
 import matplotlib.pyplot as plt
+
 
 #pd.set_option('display.max_rows', None)
 #pd.set_option('display.max_columns', None)
@@ -100,6 +100,7 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
     X = X.loc[X['isValid'] == True, :]
 
     X.drop(columns=['isValid', 'timestamp_day'], inplace=True)
+    df_count.set_index('timestamp_day', inplace=True)
 
     return X, df_count
 
@@ -212,12 +213,16 @@ def GetWeekDayCurve(x_in, sample_freq=5, threshold_accept=1.0, min_sample_per_da
 
     # Get valid data statistics
     df_count = df_count.loc[df_count['isValid'], :]
-    df_stats = df_count.groupby(df_count['timestamp_day'].dt.weekday).count()
-    days_unique = df_stats.shape[0]
-    count_days_unique = df_stats['timestamp_day'].values
+    df_stats = df_count.groupby(df_count.index.weekday).count()
+
+    # fill days that does not exist with count zero.
+    for i_day in range(0,7):
+        if i_day not in df_stats.index.values:
+            print(f'Weekday {i_day} does not exist.')
+            df_stats.loc[i_day] = 0
 
     # Has enough data do use ?
-    if (days_unique == 7) and (np.min(count_days_unique) >= min_sample_per_day):
+    if np.min(df_stats['isValid'].values) >= min_sample_per_day:
         print('Can calculate a curve for every weekday')
 
         Y = Y.groupby([Y.index.weekday, Y.index.hour, Y.index.minute]).mean()
@@ -232,14 +237,20 @@ def GetWeekDayCurve(x_in, sample_freq=5, threshold_accept=1.0, min_sample_per_da
         Y.iloc[:, 3:] = (Y.iloc[:, 3:] - mins.iloc[:, 2:]) / (maxes.iloc[:, 2:] - mins.iloc[:, 2:])
         
     else:
-        work_days = df_stats.loc[df_stats.index <= 4, 'timestamp_day'].sum()
-        sat_qty = df_stats.loc[df_stats.index == 5, 'timestamp_day'].sum()
-        sun_qty = df_stats.loc[df_stats.index == 6, 'timestamp_day'].sum()
+        work_days = df_stats.loc[df_stats.index <= 4, 'isValid'].sum()
+        sat_qty = df_stats.loc[df_stats.index == 5, 'isValid'].sum()
+        sun_qty = df_stats.loc[df_stats.index == 6, 'isValid'].sum()
 
         if (work_days >= min_sample_per_workday) and sun_qty >= min_sample_per_day and sat_qty >= min_sample_per_day:
             print('Can calculate a curve for every weekday and use Sat. and Sun.')
 
-            Y = Y.groupby([Y.index.weekday, Y.index.hour, Y.index.minute]).mean()
+            Y['WeekDay'] = Y.index.weekday.values
+            Y['Hour'] = Y.index.hour.values
+            Y['Min'] = Y.index.minute.values
+            Y = Y.reset_index(drop=True)
+            Y.loc[Y['WeekDay'] <= 4, 'WeekDay'] = 0
+
+            Y = Y.groupby([Y.WeekDay, Y.Hour, Y.Min]).mean()
             Y.index.names = ['WeekDay', 'Hour', 'Min']
             Y = Y.reset_index()
 
@@ -249,15 +260,17 @@ def GetWeekDayCurve(x_in, sample_freq=5, threshold_accept=1.0, min_sample_per_da
             mins = grouper.transform('min')
 
             Y.iloc[:, 3:] = (Y.iloc[:, 3:] - mins.iloc[:, 2:]) / (maxes.iloc[:, 2:] - mins.iloc[:, 2:])
-            
-            
-            #FALTA PEGAR UM DIA DA SEMANA MAIS PROXIMO PARA COMPLETAR OS INEXISTENTES
-            
+
+            for i_day in [1, 2, 3, 4]:
+                Y_day_aux = Y.loc[Y.WeekDay == 0, :].copy(deep=True)
+                Y_day_aux.WeekDay = i_day
+                Y = pd.concat((Y, Y_day_aux))
+            Y = Y.reset_index(drop=True)
+
         else:
-            print('Use default curve.')
-            
-            #FALTA ESCREVER UMA DEFAULT E PERMITIR IMPORTAR
-        
+            print('Not enough data using default curve.')
+            Y = pd.read_pickle("./default.wdc")
+
     return Y
    
     
@@ -415,11 +428,6 @@ if __name__ == "__main__":
     ax.plot(output.index.values,output.values)
     ax.set_title('No outliers')
 
-
-    X, _ = ReturnOnlyValidDays(output, sample_freq=5, threshold_accept=0.2)
-
-
-
     output = f_remove.PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     f_remove.CountMissingData(output,show=True)
     time_stopper.append(['PhaseProportionInput',time.perf_counter()])
@@ -428,7 +436,6 @@ if __name__ == "__main__":
     ax.plot(output.index.values,output.values)
     ax.set_title('PhaseProportionInput')
 
-    
 
     #NSSC Implementation    
     max_vet,_ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq = 5,threshold_accept = 0.2,exe_param='max')     

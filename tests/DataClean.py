@@ -320,6 +320,91 @@ def GetNSSCPredictedSamples(max_vet: pd.DataFrame,
     return Y
 
 
+
+def ReplaceData(x_in:pd.core.frame.DataFrame,
+                x_replace:pd.core.frame.DataFrame,
+                start_date_dt: datetime,
+                end_date_dt: datetime,                
+                num_samples_day:int = 12*24,
+                day_threshold:float = 0.5,
+                patamar_threshold:float = 0.5,
+                num_samples_patamar:int = 12*6,                
+                sample_freq:int = 5,
+                sample_time_base:str = 'm' ) -> pd.core.frame.DataFrame:
+
+
+
+    output_isnull_day = x_in.isnull().groupby([x_in.index.day,x_in.index.month,x_in.index.year]).sum()    
+    output_isnull_day.columns = output_isnull_day.columns.values + "_mark"
+    output_isnull_day = output_isnull_day/num_samples_day
+    
+    output_isnull_day.index.rename(['day','month','year'],inplace=True)    
+    output_isnull_day.reset_index(inplace=True)    
+    output_isnull_day.set_index(output_isnull_day['day'].astype(str) + '-' + output_isnull_day['month'].astype(str) + '-' + output_isnull_day['year'].astype(str),inplace=True)
+    output_isnull_day.drop(columns = ['day', 'month', 'year'],inplace=True)
+    
+    
+    output_isnull_day = output_isnull_day>=day_threshold        
+    output_isnull_day = output_isnull_day.loc[~(output_isnull_day.sum(axis=1)==0),:]    
+    
+       
+    
+    
+    output_isnull_patamar = x_in.copy(deep=True)
+    output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(f_remove.DayPeriodMapper)
+    output_isnull_patamar = x_in.isnull().groupby([output_isnull_patamar.index.day,output_isnull_patamar.index.month,output_isnull_patamar.index.year,output_isnull_patamar.dp]).sum()        
+    output_isnull_patamar.columns = output_isnull_patamar.columns.values + "_mark"
+    output_isnull_patamar =output_isnull_patamar/num_samples_patamar
+    
+    output_isnull_patamar.index.rename(['day', 'month', 'year','dp'],inplace=True)   
+    output_isnull_patamar.reset_index(inplace=True)    
+    output_isnull_patamar.set_index(output_isnull_patamar['day'].astype(str) + '-' + output_isnull_patamar['month'].astype(str) + '-' + output_isnull_patamar['year'].astype(str) + '-' + output_isnull_patamar['dp'].astype(str),inplace=True)
+    output_isnull_patamar.drop(columns = ['day', 'month', 'year','dp'],inplace=True)
+    
+    
+    output_isnull_patamar = output_isnull_patamar>=patamar_threshold        
+    output_isnull_patamar = output_isnull_patamar.loc[~(output_isnull_patamar.sum(axis=1)==0),:]    
+    
+    
+    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
+    mark_substitute = pd.DataFrame(index=timearray,columns = x_in.columns.values, dtype=object)    
+    mark_substitute.index.name = 'timestamp'
+    mark_substitute.loc[:,:] = False
+    
+    
+    index_day = { 'day': x_in.index.day.values.astype(str), 'month': x_in.index.month.values.astype(str), 'year': x_in.index.year.values.astype(str) }
+    index_day = pd.DataFrame(index_day)    
+    index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
+    
+    index_patamar = { 'day': x_in.index.day.values.astype(str), 'month': x_in.index.month.values.astype(str), 'year': x_in.index.year.values.astype(str) }
+    index_patamar = pd.DataFrame(index_patamar)    
+    index_patamar['dp'] = x_in.index.hour.map(f_remove.DayPeriodMapper)
+    index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
+    
+            
+    mark_substitute['index_patamar'] = index_patamar.values
+    mark_substitute = pd.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
+    for col in output.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
+    
+    mark_substitute['index_day'] = index_day.values
+    mark_substitute = pd.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
+    
+    for col in output.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
+
+    x_out =  x_in.copy(deep=True)    
+    x_out[mark_substitute] = x_replace[mark_substitute]
+
+
+    return x_out
+
 if __name__ == "__main__":
     
     import time
@@ -344,9 +429,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.addHandler(cmd_handler)
     logger.info("Example:")
-
-
-    
+   
     
     data_inicio='2021-12-15'
     data_final='2023-01-15'
@@ -354,48 +437,13 @@ if __name__ == "__main__":
     start_date_dt = dt.datetime(int(data_inicio.split("-")[0]),int(data_inicio.split("-")[1]),int(data_inicio.split("-")[2]))
     end_date_dt = dt.datetime(int(data_final.split("-")[0]),int(data_final.split("-")[1]),int(data_final.split("-")[2]))
  
-    '''    
-    dummy = np.arange(start_date_dt, end_date_dt,np.timedelta64(5,'m'), dtype='datetime64')
-    dummy = dummy + np.timedelta64(random.randint(0, 59),'s') # ADD a second to the end so during the sort this samples will be at last (HH:MM:01)   
-        
-    dummy = pd.DataFrame(dummy,columns=['timestamp'])
     
-    dummy['IA'] = 100
-    dummy['IB'] = 200
-    dummy['IV'] = 300
-    dummy['IN'] = 50
-    
-    #dummy['VA'] = 1
-    #dummy['VB'] = 2
-    #dummy['VV'] = 3
-    #dummy['VN'] = 4
-    
-    
-    dummy.set_index('timestamp', inplace=True)
-    
-    
-    for col in ['VA','VB','VV']:
-        dummy.loc[dummy.sample(frac=0.001).index, col] = np.nan
-    
-    
-    time_init = time.perf_counter()    
-    
-    '''
-
-
     #TESTE
     dummy = pd.read_csv('CALADJ2074_I.csv',names=['timestamp_aux','IA', 'IB', 'IV','IN'],skiprows=1,parse_dates=True)
     dummy.insert(loc=0, column='timestamp', value=pd.to_datetime(dummy.timestamp_aux.astype(str)))
     dummy = dummy.drop(columns=['timestamp_aux'])
     dummy.set_index('timestamp', inplace=True)
     
-    '''
-    #TESTE MANOBRAS
-    dummy_manobra = pd.read_csv('BancoManobras.csv',names=['EQ','ALIM1', 'ALIM2', 'data_inicio',"data_final"],skiprows=1,parse_dates=True)
-    dummy_manobra = dummy_manobra.iloc[:,-2:]
-    
-    dummy_manobra = pd.DataFrame([[dt.datetime(2021,1,1),dt.datetime(2021,2,1)]])
-    '''
    
     time_stopper = []    
     time_stopper.append(['time_init',time.perf_counter()])
@@ -453,88 +501,11 @@ if __name__ == "__main__":
     ax.set_title('X_pred')
 
 
-
     #Criarr as regras para substituir X_pred no vetor x_in
-    
-    
-    num_samples_day = 12*24
-    day_threshold = 0.5
-    patamar_threshold = 0.5
-    num_samples_patamar = 12*6
-    sample_freq = 5
-    sample_time_base = 'm'
-    
-    output_isnull_day = output.isnull().groupby([output.index.day,output.index.month,output.index.year]).sum()    
-    output_isnull_day.columns = output_isnull_day.columns.values + "_mark"
-    output_isnull_day = output_isnull_day/num_samples_day
-    
-    output_isnull_day.index.rename(['day','month','year'],inplace=True)    
-    output_isnull_day.reset_index(inplace=True)    
-    output_isnull_day.set_index(output_isnull_day['day'].astype(str) + '-' + output_isnull_day['month'].astype(str) + '-' + output_isnull_day['year'].astype(str),inplace=True)
-    output_isnull_day.drop(columns = ['day', 'month', 'year'],inplace=True)
-    
-    
-    output_isnull_day = output_isnull_day>=day_threshold        
-    output_isnull_day = output_isnull_day.loc[~(output_isnull_day.sum(axis=1)==0),:]    
-    
-       
-    
-    
-    output_isnull_patamar = output.copy(deep=True)
-    output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(f_remove.DayPeriodMapper)
-    output_isnull_patamar = output.isnull().groupby([output_isnull_patamar.index.day,output_isnull_patamar.index.month,output_isnull_patamar.index.year,output_isnull_patamar.dp]).sum()        
-    output_isnull_patamar.columns = output_isnull_patamar.columns.values + "_mark"
-    output_isnull_patamar =output_isnull_patamar/num_samples_patamar
-    
-    output_isnull_patamar.index.rename(['day', 'month', 'year','dp'],inplace=True)   
-    output_isnull_patamar.reset_index(inplace=True)    
-    output_isnull_patamar.set_index(output_isnull_patamar['day'].astype(str) + '-' + output_isnull_patamar['month'].astype(str) + '-' + output_isnull_patamar['year'].astype(str) + '-' + output_isnull_patamar['dp'].astype(str),inplace=True)
-    output_isnull_patamar.drop(columns = ['day', 'month', 'year','dp'],inplace=True)
-    
-    
-    output_isnull_patamar = output_isnull_patamar>=patamar_threshold        
-    output_isnull_patamar = output_isnull_patamar.loc[~(output_isnull_patamar.sum(axis=1)==0),:]    
-    
-    
-    timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
-    mark_substitute = pd.DataFrame(index=timearray,columns = output.columns.values, dtype=object)    
-    mark_substitute.index.name = 'timestamp'
-    mark_substitute.loc[:,:] = False
-       
-    
-    
-    
-    
-    index_day = { 'day': output.index.day.values.astype(str), 'month': output.index.month.values.astype(str), 'year': output.index.year.values.astype(str) }
-    index_day = pd.DataFrame(index_day)    
-    index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
-    
-    index_patamar = { 'day': output.index.day.values.astype(str), 'month': output.index.month.values.astype(str), 'year': output.index.year.values.astype(str) }
-    index_patamar = pd.DataFrame(index_patamar)    
-    index_patamar['dp'] = output.index.hour.map(f_remove.DayPeriodMapper)
-    index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
-    
-            
-    mark_substitute['index_patamar'] = index_patamar.values
-    mark_substitute = pd.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
-    for col in output.columns.values:
-        mark_substitute[col] = mark_substitute[col+'_mark']
-        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
-        
-    mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
-    
-    mark_substitute['index_day'] = index_day.values
-    mark_substitute = pd.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
-    
-    for col in output.columns.values:
-        mark_substitute[col] = mark_substitute[col+'_mark']
-        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
-        
-    mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
+    #Validar as regras de substituição do x_pred no vetor x_in
+    # Criar uma função que implemente todo o NSSC
 
-    
-    
-    output[mark_substitute] = X_pred[mark_substitute]
+    output = ReplaceData(output,X_pred,start_date_dt,end_date_dt)
 
     time_stopper.append(['NSSC', time.perf_counter()])
     
@@ -566,8 +537,7 @@ if __name__ == "__main__":
     #TESTED - OK #output = PhaseProportionInput(output,threshold_accept = 0.60,remove_from_process=['IN'])
     
     
-    #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)
-    
+    #output = GetWeekDayCurve(dummy,sample_freq = 5,threshold_accept = 1.0)    
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5,pre_interpol=1,pos_interpol=1,integrate=True,interpol_integrate=1)
     #output = SimpleProcess(dummy,start_date_dt,end_date_dt,sample_freq = 5)
 
@@ -576,4 +546,6 @@ if __name__ == "__main__":
     #   CODE PROFILE   #
     #------------------#
     
-    f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=5*1000)
+    f_remove.TimeProfile(time_stopper,name='Main',show=True,estimate_for=1200)
+
+

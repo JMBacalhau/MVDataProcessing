@@ -1681,7 +1681,7 @@ def GetWeekDayCurve(x_in: pandas.core.frame.DataFrame, sample_freq:int=5, thresh
             for i_day in [1, 2, 3, 4]:
                 Y_day_aux = Y.loc[Y.WeekDay == 0, :].copy(deep=True)
                 Y_day_aux.WeekDay = i_day
-                Y = pandas.core.frame.concat((Y, Y_day_aux))
+                Y = pandas.concat((Y, Y_day_aux))
             Y = Y.reset_index(drop=True)
 
         else:
@@ -1738,11 +1738,11 @@ def GetNSSCPredictedSamples(max_vet: pandas.core.frame.DataFrame,
 
     weekday_curve_vet_begin = weekday_curve.iloc[(first_day * 12 * 24):, :].reset_index(drop=True)
     num_mid_weeks = int(numpy.floor((num_days - (7 - first_day)) / 7))
-    weekday_curve_vet_mid = pandas.core.frame.concat([weekday_curve] * num_mid_weeks)
+    weekday_curve_vet_mid = pandas.concat([weekday_curve] * num_mid_weeks)
     num_end_days = num_days - num_mid_weeks * 7 - (7 - first_day)
     weekday_curve_vet_end = weekday_curve.iloc[:num_end_days * (12 * 24), :].reset_index(drop=True)
 
-    weekday_curve_vet = pandas.core.frame.concat([weekday_curve_vet_begin, weekday_curve_vet_mid, weekday_curve_vet_end])
+    weekday_curve_vet = pandas.concat([weekday_curve_vet_begin, weekday_curve_vet_mid, weekday_curve_vet_end])
 
     weekday_curve_vet = weekday_curve_vet.reset_index(drop=True)
 
@@ -1847,7 +1847,7 @@ def ReplaceData(x_in:pandas.core.frame.DataFrame,
     
     
     mark_substitute['index_patamar'] = index_patamar.values
-    mark_substitute = pandas.core.frame.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
+    mark_substitute = pandas.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
     for col in x_in.columns.values:
         mark_substitute[col] = mark_substitute[col+'_mark']
         mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
@@ -1855,7 +1855,7 @@ def ReplaceData(x_in:pandas.core.frame.DataFrame,
     mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
     
     mark_substitute['index_day'] = index_day.values
-    mark_substitute = pandas.core.frame.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
+    mark_substitute = pandas.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
     
     for col in x_in.columns.values:
         mark_substitute[col] = mark_substitute[col+'_mark']
@@ -1933,6 +1933,7 @@ def NSSCInput(x_in: pandas.core.frame.DataFrame,
     
 
     return x_out
+
 
 def CurrentDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
     dummy_day = pandas.DataFrame([[129.2, 122.5, 118.8, 4.7],
@@ -2681,14 +2682,8 @@ def EnergyDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-0
 
 def ShowExampleSimpleProcess():
     
-    data_inicio = '2021-01-01'
-    data_final = '2023-01-01'
-
-    start_date_dt = datetime(int(data_inicio.split("-")[0]), int(data_inicio.split("-")[1]),
-                             int(data_inicio.split("-")[2]))
-
-    end_date_dt = datetime(int(data_final.split("-")[0]), int(data_final.split("-")[1]),
-                           int(data_final.split("-")[2]))
+    start_date_dt = datetime(2021,1,1)
+    end_date_dt = datetime(2023,1,1)
 
     dummy = CurrentDummyData()
     dummy.plot(title="Current Input (with outliers [A]")
@@ -2706,7 +2701,7 @@ def ShowExampleSimpleProcess():
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.plot(output.values)
-    ax.set_title('Whitout Outliers (RemoveOutliersHardThreshold)')
+    ax.set_title('Without Outliers (RemoveOutliersHardThreshold)')
 
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersHardThreshold', time.perf_counter()])
@@ -2714,7 +2709,7 @@ def ShowExampleSimpleProcess():
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.plot(output.values)
-    ax.set_title('Whitout Outliers (+RemoveOutliersMMADMM)')
+    ax.set_title('Without Outliers (+RemoveOutliersMMADMM)')
 
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersMMADMM', time.perf_counter()])
@@ -2722,7 +2717,7 @@ def ShowExampleSimpleProcess():
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.plot(output.values)
-    ax.set_title('Whitout Outliers (+RemoveOutliersQuantile)')
+    ax.set_title('Without Outliers (+RemoveOutliersQuantile)')
 
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersQuantile', time.perf_counter()])
@@ -2730,7 +2725,7 @@ def ShowExampleSimpleProcess():
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.plot(output.values)
-    ax.set_title('Whitout Outliers (+RemoveOutliersHistoGram)')
+    ax.set_title('Without Outliers (+RemoveOutliersHistoGram)')
 
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersHistoGram', time.perf_counter()])

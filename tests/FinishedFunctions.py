@@ -12,7 +12,7 @@ import time
 from datetime import datetime
 from itertools import permutations
 import random
-
+import matplotlib.pyplot
 
 def TimeProfile(time_stopper: list, name: str = '', show: bool = False, estimate_for: int = 0):
     """
@@ -24,7 +24,7 @@ def TimeProfile(time_stopper: list, name: str = '', show: bool = False, estimate
 
     Put a -> time_stopper.append(['time_init',time.perf_counter()]) at the beginning.
 
-    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the fist parameter being
+    Put time_stopper.append(['Func_01',time.perf_counter()]) after the code block with the first parameter being
     a name and the second being the time.
 
     Call this function at the end.
@@ -1091,7 +1091,7 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
     X_mad.iloc[-2 * len_mov_avg:, :] = X_mad.iloc[-2 * len_mov_avg:, :].fillna(method='ffill')
     X_mad.iloc[:2 * len_mov_avg, :] = X_mad.iloc[:2 * len_mov_avg, :].fillna(method='bfill')
 
-    # ------------ Coloca no mínimo 0.5kV de faixa de segurança para dados com baixa variância ------------#
+    # ------------ Coloca no mínimo de faixa de segurança para dados com baixa variância ------------#
     X_mad[X_mad <= min_var_def] = min_var_def
 
     # ------------ MAD Móvel Limites ------------#
@@ -1434,6 +1434,505 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
 
     return Y
 
+
+def ReturnOnlyValidDays(x_in: pandas.core.frame.DataFrame,
+                        sample_freq: int = 5,
+                        threshold_accept: float = 1.0,
+                        sample_time_base: str = 'm',
+                        remove_from_process=[]) -> tuple:
+    """
+    Returns all valid days. A valid day is one with no missing values for any 
+    of the timeseries on each column.
+    
+    
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetime.DatetimeIndex"
+    and each column contain an electrical quantity time series.
+    :type x_in: pandas.core.frame.DataFrame
+    
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.  
+    :type sample_freq: int,optional
+    
+    :param threshold_accept: The amount of samples that is required to consider a valid day. Defaults to 1 (100%).  
+    :type threshold_accept: float,optional
+    
+    :param sample_time_base: The base time of the sample frequency. Specify if the sample frequency is in (h)ours,
+    (m)inutes, or (s)econds. Defaults to (m)inutes.
+    :type sample_time_base: srt,optional
+    
+    :param remove_from_process: Columns to be kept off the process;  
+    :type remove_from_process: list,optional
+    
+         
+    :raises Exception: if x_in has no DatetimeIndex. 
+    :raises Exception: if sample_time_base is not in seconds, minutes or hours.
+    
+    
+    :return: Y: A tupole with the pandas.core.frame.DataFrame with samples filled based on the proportion
+    between time series and the number of valid days
+    :rtype: Y: tuple
+
+    """
+
+    # BASIC INPUT CHECK
+    
+    if not(isinstance(x_in.index, pandas.core.frame.DatetimeIndex)):
+        raise Exception("DataFrame has no DatetimeIndex.")
+    if sample_time_base not in ['s', 'm', 'h']:
+        raise Exception("The sample_time_base is not in seconds, minutes or hours.")
+
+    X = x_in.copy(deep=True)
+    
+    if len(remove_from_process) > 0:
+        X = X.drop(remove_from_process, axis=1)
+
+    qty_sample_dic = {'s': 24 * 60 * 60, 'm': 24 * 60, 'h': 24}
+
+    df_count = X.groupby([X.index.year, X.index.month, X.index.day]).count() / (
+                qty_sample_dic[sample_time_base] / sample_freq)
+
+    time_vet_stamp = X.index[numpy.arange(0, len(X.index), int((qty_sample_dic[sample_time_base] / sample_freq)))]
+    df_count = df_count.reset_index(drop=True)
+    df_count.insert(0, 'timestamp_day', time_vet_stamp)
+    df_count.set_index('timestamp_day', inplace=True)
+    df_count = df_count >= threshold_accept
+    
+    df_count = df_count.sum(axis=1) == df_count.shape[1]
+    df_count.name = 'isValid'
+    df_count = df_count.reset_index()
+    X['timestamp_day'] = X.index.floor("D").values
+
+    keep_X_index = X.index
+    X = pandas.merge(X, df_count, on='timestamp_day', how='left')
+    X.index = keep_X_index
+    X = X.loc[X['isValid'] == True, :]
+
+    X.drop(columns=['isValid', 'timestamp_day'], inplace=True)
+    df_count.set_index('timestamp_day', inplace=True)
+
+    return X, df_count
+
+
+def GetDayMaxMin(x_in: pandas.core.frame.DataFrame, start_date_dt: datetime, end_date_dt:datetime, sample_freq: int =5, threshold_accept:float=1.0, exe_param:str='max'):
+    """
+    Returns a tuple of pandas.core.frame.DataFrame containing the values of maximum or minimum of each day
+    and the timestamp of each occurrence. For each weekday that is not a valid day the maximum or minimum
+    is interpolated->ffill->bff. The interpolation is made regarding each weekday.
+
+    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetime.DatetimeIndex"
+    and each column contain an electrical quantity time series.
+    :type x_in: pandas.core.frame.DataFrame
+
+    :param start_date_dt:
+    :param end_date_dt:
+
+    :param sample_freq: The sample frequency of the time series. Defaults to 5.
+    :type sample_freq: int,optional
+
+    :param threshold_accept: The amount of samples that is required to consider a valid day. Defaults to 1 (100%).
+    :type threshold_accept: float,optional
+
+    :param exe_param: 'max' return the maximum and min return the minimum value of each valid day
+    (Default value = 'max')
+    :type exe_param: srt,optional
+
+    :return: Y: The first parameter is a pandas.core.frame.DataFrame with maximum value for each day
+    and the second parameter pandas.core.frame.DataFrame with the timestamps.
+    :rtype: Y: tuple
+    """
+
+    # BASIC INPUT CHECK
+    
+    if not(isinstance(x_in.index, pandas.core.frame.DatetimeIndex)):
+        raise Exception("DataFrame has no DatetimeIndex.")
+
+    X = x_in.copy(deep=True)
+
+    X, _ = ReturnOnlyValidDays(X, sample_freq, threshold_accept)
+
+    if exe_param == 'max':
+        Y = X.groupby([X.index.year, X.index.month, X.index.day]).max()
+        vet_idx = X.groupby([X.index.year, X.index.month, X.index.day]).idxmax()
+    else:
+        Y = X.groupby([X.index.year, X.index.month, X.index.day]).min()
+        vet_idx = X.groupby([X.index.year, X.index.month, X.index.day]).idxmin()
+
+    # redo the timestamp index
+    vet_idx.index.rename(['Year', 'Month', 'Day'], inplace=True)
+    vet_idx = vet_idx.reset_index(drop=False)
+
+    time_vet_stamp = pandas.to_datetime(
+        vet_idx['Year'].astype(str) + '-' + vet_idx['Month'].astype(str) + '-' + vet_idx['Day'].astype(str))
+
+    vet_idx.drop(columns=['Year', 'Month', 'Day'], axis=1, inplace=True)
+    vet_idx = vet_idx.reset_index(drop=True)
+    vet_idx.insert(0, 'timestamp_day', time_vet_stamp)
+    vet_idx.set_index('timestamp_day', inplace=True)
+
+    # redo the timestamp index
+    Y.index.rename(['Year', 'Month', 'Day'], inplace=True)
+    Y = Y.reset_index(drop=False)
+
+    time_vet_stamp = pandas.to_datetime(Y['Year'].astype(str) + '-' + Y['Month'].astype(str) + '-' + Y['Day'].astype(str))
+
+    Y.drop(columns=['Year', 'Month', 'Day'], axis=1, inplace=True)
+    Y = Y.reset_index(drop=True)
+    Y.insert(0, 'timestamp_day', time_vet_stamp)
+    Y.set_index('timestamp_day', inplace=True)
+
+    Y = DataSynchronization(Y, start_date_dt, end_date_dt, sample_freq=1, sample_time_base='D')
+
+    vet_idx = pandas.merge(vet_idx, Y, left_index=True, right_index=True, how='right', suffixes=('', '_remove'))
+    vet_idx.drop(columns=vet_idx.columns[vet_idx.columns.str.contains('_remove')], axis=1, inplace=True)
+
+    # Missing days get midnight as the  hour of max and min
+    for col in vet_idx.columns.values:
+        vet_idx.loc[vet_idx[col].isna(), col] = vet_idx.index[vet_idx[col].isna()]
+
+    # Interpolate by day of the week
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.interpolate())
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.ffill())
+    Y = Y.groupby(Y.index.weekday, group_keys=False).apply(lambda x: x.bfill())
+
+    return Y, vet_idx
+
+
+def GetWeekDayCurve(x_in: pandas.core.frame.DataFrame, sample_freq:int=5, threshold_accept:float=1.0, min_sample_per_day:int=3, min_sample_per_workday:int=9):
+    """
+    Analyzes and normalizes time series data in a DataFrame to compute average curves for each weekday, 
+    considering various sampling and validity thresholds.
+
+    :param x_in: Input DataFrame with a DatetimeIndex.
+    :type: pandas.core.frame.DataFrame
+    :param sample_freq: Sampling frequency in minutes, default is 5.
+    :type: int
+    :param threshold_accept: Threshold for accepting valid data, default is 1.0.
+    :type: float
+    :param min_sample_per_day: Minimum samples required per day to consider the data valid, default is 3.
+    :type: int
+    :param min_sample_per_workday: Minimum samples required per workday (Monday to Friday) to consider the data valid, default is 9.
+    :type: int
+    
+    :raises Exception: If the DataFrame does not have a DatetimeIndex.
+
+    :return: A DataFrame containing the normalized data for each weekday.
+    :rtype: pandas.core.frame.DataFrame
+    """
+
+    # BASIC INPUT CHECK
+
+    if not (isinstance(x_in.index, pandas.core.frame.DatetimeIndex)):
+        raise Exception("DataFrame has no DatetimeIndex.")
+   
+    
+    X = x_in.copy(deep=True)
+
+    Y, df_count = ReturnOnlyValidDays(X, sample_freq, threshold_accept)
+
+    # Get valid data statistics
+    df_count = df_count.loc[df_count['isValid'], :]
+    df_stats = df_count.groupby(df_count.index.weekday).count()
+
+    # fill days that does not exist with count zero.
+    for i_day in range(0,7):
+        if i_day not in df_stats.index.values:
+            print(f'Weekday {i_day} does not exist.')
+            df_stats.loc[i_day] = 0
+
+    # Has enough data do use ?
+    if numpy.min(df_stats['isValid'].values) >= min_sample_per_day:
+        print('Can calculate a curve for every weekday')
+
+        Y = Y.groupby([Y.index.weekday, Y.index.hour, Y.index.minute]).mean()
+        Y.index.names = ['WeekDay', 'Hour', 'Min']
+        Y = Y.reset_index()
+
+        # Normalization max min each day
+        grouper = Y.groupby([Y.WeekDay])
+        maxes = grouper.transform('max')
+        mins = grouper.transform('min')
+
+        Y.iloc[:, 3:] = (Y.iloc[:, 3:] - mins.iloc[:, 2:]) / (maxes.iloc[:, 2:] - mins.iloc[:, 2:])
+        
+    else:
+        work_days = df_stats.loc[df_stats.index <= 4, 'isValid'].sum()
+        sat_qty = df_stats.loc[df_stats.index == 5, 'isValid'].sum()
+        sun_qty = df_stats.loc[df_stats.index == 6, 'isValid'].sum()
+
+        if (work_days >= min_sample_per_workday) and sun_qty >= min_sample_per_day and sat_qty >= min_sample_per_day:
+            print('Can calculate a curve for every weekday and use Sat. and Sun.')
+
+            Y['WeekDay'] = Y.index.weekday.values
+            Y['Hour'] = Y.index.hour.values
+            Y['Min'] = Y.index.minute.values
+            Y = Y.reset_index(drop=True)
+            Y.loc[Y['WeekDay'] <= 4, 'WeekDay'] = 0
+
+            Y = Y.groupby([Y.WeekDay, Y.Hour, Y.Min]).mean()
+            Y.index.names = ['WeekDay', 'Hour', 'Min']
+            Y = Y.reset_index()
+
+            # Normalization max min each day
+            grouper = Y.groupby([Y.WeekDay])
+            maxes = grouper.transform('max')
+            mins = grouper.transform('min')
+
+            Y.iloc[:, 3:] = (Y.iloc[:, 3:] - mins.iloc[:, 2:]) / (maxes.iloc[:, 2:] - mins.iloc[:, 2:])
+
+            for i_day in [1, 2, 3, 4]:
+                Y_day_aux = Y.loc[Y.WeekDay == 0, :].copy(deep=True)
+                Y_day_aux.WeekDay = i_day
+                Y = pandas.core.frame.concat((Y, Y_day_aux))
+            Y = Y.reset_index(drop=True)
+
+        else:
+            print('Not enough data using default curve.')
+            Y = pandas.read_pickle("./default.wdc")
+
+    return Y
+
+
+def GetNSSCPredictedSamples(max_vet: pandas.core.frame.DataFrame,
+                            min_vet: pandas.core.frame.DataFrame,
+                            weekday_curve: pandas.core.frame.DataFrame,
+                            start_date_dt: datetime, 
+                            end_date_dt:datetime,
+                            sample_freq: int = 5,                        
+                            sample_time_base: str = 'm') -> pandas.core.frame.DataFrame:
+    """
+    Generate predicted samples for NS-SSC using maximum and minimum vectors, 
+    and a curve based on weekdays.
+
+    :param max_vet: The maximum vector DataFrame.
+    :type max_vet: pandas.core.frame.DataFrame
+    :param min_vet: The minimum vector DataFrame.
+    :type min_vet: pandas.core.frame.DataFrame
+    :param weekday_curve: DataFrame representing the curve based on weekdays.
+    :type weekday_curve: pandas.core.frame.DataFrame
+    :param sample_freq: The frequency of sampling. Defaults to 5.
+    :type sample_freq: int
+    :param sample_time_base: The base unit of time for sampling, can be 's', 'm', or 'h'. Defaults to 'm'.
+    :type sample_time_base: str
+
+    :raises Exception: If the sample_time_base is not 's', 'm', or 'h'.
+
+    :return: A DataFrame with predicted values.
+    :rtype: pandas.core.frame.DataFrame
+    """
+    
+    
+    # BASIC INPUT CHECK
+
+    if sample_time_base not in ['s', 'm', 'h']:
+        raise Exception("The sample_time_base is not in seconds, minutes or hours.")
+
+    max_vet = max_vet.iloc[numpy.repeat(numpy.arange(len(max_vet)), 12*24)]
+    min_vet = min_vet.iloc[numpy.repeat(numpy.arange(len(min_vet)), 12*24)]
+
+    time_array = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(sample_freq, sample_time_base),dtype='datetime64')
+
+    vet_samples = pandas.core.frame.DataFrame(index=time_array, dtype=object)
+    vet_samples.index.name = 'timestamp'
+
+    num_days = int(vet_samples.shape[0] / (12 * 24))
+    first_day = vet_samples.index[0].weekday()
+
+    weekday_curve_vet_begin = weekday_curve.iloc[(first_day * 12 * 24):, :].reset_index(drop=True)
+    num_mid_weeks = int(numpy.floor((num_days - (7 - first_day)) / 7))
+    weekday_curve_vet_mid = pandas.core.frame.concat([weekday_curve] * num_mid_weeks)
+    num_end_days = num_days - num_mid_weeks * 7 - (7 - first_day)
+    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days * (12 * 24), :].reset_index(drop=True)
+
+    weekday_curve_vet = pandas.core.frame.concat([weekday_curve_vet_begin, weekday_curve_vet_mid, weekday_curve_vet_end])
+
+    weekday_curve_vet = weekday_curve_vet.reset_index(drop=True)
+
+    print(weekday_curve_vet)
+    weekday_curve_vet.drop(columns=['WeekDay', 'Hour', 'Min'], inplace=True)
+    weekday_curve_vet.index.name = 'timestamp'
+    weekday_curve_vet.index = vet_samples.index
+
+    max_vet.index = vet_samples.index
+    min_vet.index = vet_samples.index
+
+    Y = (max_vet - min_vet) * weekday_curve_vet + min_vet
+
+    return Y
+
+
+def ReplaceData(x_in:pandas.core.frame.DataFrame,
+                x_replace:pandas.core.frame.DataFrame,
+                start_date_dt: datetime,
+                end_date_dt: datetime,                
+                num_samples_day:int = 12*24,
+                day_threshold:float = 0.5,
+                patamar_threshold:float = 0.5,
+                num_samples_patamar:int = 12*6,                
+                sample_freq:int = 5,
+                sample_time_base:str = 'm' ) -> pandas.core.frame.DataFrame:
+    """
+    Replaces data in a DataFrame based on specified conditions and thresholds.
+
+    :param x_in: The input DataFrame containing the data to be analyzed and replaced.
+    :type x_in: pandas.core.frame.core.frame.DataFrame
+    :param x_replace: The DataFrame containing replacement data.
+    :type x_replace: pandas.core.frame.core.frame.DataFrame
+    :param start_date_dt: The start date for the data replacement process.
+    :type start_date_dt: datetime
+    :param end_date_dt: The end date for the data replacement process.
+    :type end_date_dt: datetime
+    :param num_samples_day: The number of samples per day, default is 288 (12 * 24).
+    :type num_samples_day: int
+    :param day_threshold: The threshold for day-based null value analysis, default is 0.5.
+    :type day_threshold: float
+    :param patamar_threshold: The threshold for patamar-based null value analysis, default is 0.5.
+    :type patamar_threshold: float
+    :param num_samples_patamar: The number of samples per patamar, default is 72 (12 * 6).
+    :type num_samples_patamar: int
+    :param sample_freq: The frequency of samples, default is 5.
+    :type sample_freq: int
+    :param sample_time_base: The time base unit for sampling, default is 'm' (minutes).
+    :type sample_time_base: str
+    :return: A DataFrame with data replaced based on the specified conditions.
+    :rtype: pandas.core.frame.core.frame.DataFrame
+    
+    Note: `x_in` and `x_replace` must have the same structure and index type.
+    """
+
+    #Mark days and patamar with null values greater than threshold
+    output_isnull_day = x_in.isnull().groupby([x_in.index.day,x_in.index.month,x_in.index.year]).sum()    
+    output_isnull_day.columns = output_isnull_day.columns.values + "_mark"
+    output_isnull_day = output_isnull_day/num_samples_day
+    
+    output_isnull_day.index.rename(['day','month','year'],inplace=True)    
+    output_isnull_day.reset_index(inplace=True)    
+    output_isnull_day.set_index(output_isnull_day['day'].astype(str) + '-' + output_isnull_day['month'].astype(str) + '-' + output_isnull_day['year'].astype(str),inplace=True)
+    output_isnull_day.drop(columns = ['day', 'month', 'year'],inplace=True)
+    
+    
+    output_isnull_day = output_isnull_day>=day_threshold        
+    output_isnull_day = output_isnull_day.loc[~(output_isnull_day.sum(axis=1)==0),:]    
+    
+    #Mark Patamar with null values greater than threshold
+    output_isnull_patamar = x_in.copy(deep=True)
+    output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(DayPeriodMapper)
+    output_isnull_patamar = x_in.isnull().groupby([output_isnull_patamar.index.day,output_isnull_patamar.index.month,output_isnull_patamar.index.year,output_isnull_patamar.dp]).sum()        
+    output_isnull_patamar.columns = output_isnull_patamar.columns.values + "_mark"
+    output_isnull_patamar =output_isnull_patamar/num_samples_patamar
+    
+    output_isnull_patamar.index.rename(['day', 'month', 'year','dp'],inplace=True)   
+    output_isnull_patamar.reset_index(inplace=True)    
+    output_isnull_patamar.set_index(output_isnull_patamar['day'].astype(str) + '-' + output_isnull_patamar['month'].astype(str) + '-' + output_isnull_patamar['year'].astype(str) + '-' + output_isnull_patamar['dp'].astype(str),inplace=True)
+    output_isnull_patamar.drop(columns = ['day', 'month', 'year','dp'],inplace=True)
+    
+    
+    output_isnull_patamar = output_isnull_patamar>=patamar_threshold        
+    output_isnull_patamar = output_isnull_patamar.loc[~(output_isnull_patamar.sum(axis=1)==0),:]    
+    
+    
+    #Create a time array with the same size of x_in
+    timearray = numpy.arange(start_date_dt, end_date_dt,numpy.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
+    mark_substitute = pandas.core.frame.DataFrame(index=timearray,columns = x_in.columns.values, dtype=object)    
+    mark_substitute.index.name = 'timestamp'
+    mark_substitute.loc[:,:] = False
+    
+    #Create index for day and patamar
+    index_day = { 'day': x_in.index.day.values.astype(str), 'month': x_in.index.month.values.astype(str), 'year': x_in.index.year.values.astype(str) }
+    index_day = pandas.core.frame.DataFrame(index_day)    
+    index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
+    
+    index_patamar = { 'day': x_in.index.day.values.astype(str), 'month': x_in.index.month.values.astype(str), 'year': x_in.index.year.values.astype(str) }
+    index_patamar = pandas.core.frame.DataFrame(index_patamar)    
+    index_patamar['dp'] = x_in.index.hour.map(DayPeriodMapper)
+    index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
+    
+    
+    mark_substitute['index_patamar'] = index_patamar.values
+    mark_substitute = pandas.core.frame.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
+    for col in x_in.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
+    
+    mark_substitute['index_day'] = index_day.values
+    mark_substitute = pandas.core.frame.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
+    
+    for col in x_in.columns.values:
+        mark_substitute[col] = mark_substitute[col+'_mark']
+        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        
+    mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
+
+    #Replace data
+    x_out =  x_in.copy(deep=True)    
+    x_out[mark_substitute] = x_replace[mark_substitute]
+
+
+    return x_out
+
+
+def NSSCInput(x_in: pandas.core.frame.DataFrame,
+                 start_date_dt: datetime,
+                 end_date_dt: datetime,
+                 sample_freq: int = 5,
+                 sample_time_base:str='m',
+                 threshold_accept_min_max: float = 1.0,
+                 threshold_accept_curve: float = 1.0,                 
+                 num_samples_day:int = 12*24,
+                 num_samples_patamar:int = 12*6,      
+                 day_threshold:float = 0.5,
+                 patamar_threshold:float = 0.5,                 
+                 min_sample_per_day: int = 3,
+                 min_sample_per_workday: int = 9) -> pandas.core.frame.DataFrame:
+    """
+    Implement the NSSC method.
+
+    :param x_in: Input data frame.
+    :type x_in: pandas.core.frame.DataFrame
+    :param start_date_dt: Start date for the processing.
+    :type start_date_dt: datetime
+    :param end_date_dt: End date for the processing.
+    :type end_date_dt: datetime
+    :param sample_freq: Sampling frequency, default is 5.
+    :type sample_freq: int
+    :param threshold_accept_min_max: Threshold for accepting minimum and maximum values, default is 1.0.
+    :type threshold_accept_min_max: float
+    :param threshold_accept_curve: Threshold for accepting curve values, default is 1.0.
+    :type threshold_accept_curve: float
+    :param min_sample_per_day: Minimum number of samples per day, default is 3.
+    :type min_sample_per_day: int
+    :param num_samples_day: Number of samples per day, default is 288 (12*24).
+    :type num_samples_day: int
+    :param day_threshold: Day threshold value, default is 0.5.
+    :type day_threshold: float
+    :param patamar_threshold: Patamar threshold value, default is 0.5.
+    :type patamar_threshold: float
+    :param num_samples_patamar: Number of samples for patamar, default is 72 (12*6).
+    :type num_samples_patamar: int
+    :param sample_time_base: Base unit for sample time, default is 'm' for minutes.
+    :type sample_time_base: str
+    :param min_sample_per_workday: Minimum number of samples per workday, default is 9.
+    :type min_sample_per_workday: int
+
+    :return: Processed data frame.
+    :rtype: pandas.core.frame.DataFrame
+    """
+    
+    # Get day max/min values
+    max_vet,_ = GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq,threshold_accept_min_max,exe_param='max')         
+    min_vet,_ = GetDayMaxMin(x_in,start_date_dt,end_date_dt,sample_freq,threshold_accept_min_max,exe_param='min')  
+
+    # Get weekday curve
+    weekday_curve = GetWeekDayCurve(x_in, sample_freq, threshold_accept_curve, min_sample_per_day, min_sample_per_workday)
+    
+    # Get NSSC predicted samples
+    X_pred = GetNSSCPredictedSamples(max_vet, min_vet, weekday_curve, sample_freq,sample_time_base)
+
+    # Replace data
+    x_out = ReplaceData(x_in,X_pred,start_date_dt,end_date_dt,num_samples_day,day_threshold,patamar_threshold,num_samples_patamar,sample_freq,sample_time_base)
+    
+
+    return x_out
 
 def CurrentDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
     dummy_day = pandas.DataFrame([[129.2, 122.5, 118.8, 4.7],
@@ -2180,7 +2679,8 @@ def EnergyDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-0
     return dummy
 
 
-def ShowExample():
+def ShowExampleSimpleProcess():
+    
     data_inicio = '2021-01-01'
     data_final = '2023-01-01'
 
@@ -2195,22 +2695,47 @@ def ShowExample():
 
     time_stopper = [['time_init', time.perf_counter()]]
     output = DataSynchronization(dummy, start_date_dt, end_date_dt, sample_freq=5, sample_time_base='m')
+    
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Input')
+
     CountMissingData(output, show=True)
     time_stopper.append(['DataSynchronization', time.perf_counter()])
     output = RemoveOutliersHardThreshold(output, hard_max=500, hard_min=0)
+
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Whitout Outliers (RemoveOutliersHardThreshold)')
+
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersHardThreshold', time.perf_counter()])
     output = RemoveOutliersMMADMM(output, len_mov_avg=3, std_def=4, plot=False, remove_from_process=['IN'])
+
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Whitout Outliers (+RemoveOutliersMMADMM)')
+
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersMMADMM', time.perf_counter()])
     output = RemoveOutliersQuantile(output)
+
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Whitout Outliers (+RemoveOutliersQuantile)')
+
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersQuantile', time.perf_counter()])
     output = RemoveOutliersHistoGram(output, min_number_of_samples_limit=12 * 5)
+
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Whitout Outliers (+RemoveOutliersHistoGram)')
+
     CountMissingData(output, show=True)
     time_stopper.append(['RemoveOutliersHistoGram', time.perf_counter()])
 
-    output.plot(title="Current Output (no outliers) [A]")
+    
 
     output = SimpleProcess(output, start_date_dt, end_date_dt,
                            remove_from_process=['IN'],
@@ -2225,7 +2750,12 @@ def ShowExample():
     time_stopper.append(['SimpleProcessInput', time.perf_counter()])
     CountMissingData(output, show=True)
 
-    output.plot(title="Current Output (No missing data) [A]")
+    fig, ax = matplotlib.pyplot.subplots()
+    ax.plot(output.values)
+    ax.set_title('Output (SimpleProcess)')
+    matplotlib.pyplot.show()
+    
     TimeProfile(time_stopper, name='Main', show=True, estimate_for=1000 * 5)
 
     return
+

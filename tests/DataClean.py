@@ -104,8 +104,7 @@ def ReturnOnlyValidDays(x_in: pd.DataFrame,
 
     return X, df_count
 
-
-def GetDayMaxMin(x_in, start_date_dt, end_date_dt, sample_freq=5, threshold_accept=1.0, exe_param='max'):
+def GetDayMaxMin(x_in: pd.DataFrame, start_date_dt: datetime, end_date_dt:datetime, sample_freq: int =5, threshold_accept:float=1.0, exe_param:str='max'):
     """
     Returns a tuple of pandas.core.frame.DataFrame containing the values of maximum or minimum of each day
     and the timestamp of each occurrence. For each weekday that is not a valid day the maximum or minimum
@@ -188,16 +187,26 @@ def GetDayMaxMin(x_in, start_date_dt, end_date_dt, sample_freq=5, threshold_acce
 
     return Y, vet_idx
 
-
-def GetWeekDayCurve(x_in, sample_freq=5, threshold_accept=1.0, min_sample_per_day=3, min_sample_per_workday=9):
+def GetWeekDayCurve(x_in: pd.DataFrame, sample_freq:int=5, threshold_accept:float=1.0, min_sample_per_day:int=3, min_sample_per_workday:int=9):
     """
+    Analyzes and normalizes time series data in a DataFrame to compute average curves for each weekday, 
+    considering various sampling and validity thresholds.
 
-    :param x_in: param sample_freq:  (Default value = 5)
-    :param threshold_accept: Default value = 1.0)
-    :param min_sample_per_day: Default value = 3)
-    :param min_sample_per_workday: Default value = 9)
-    :param sample_freq:  (Default value = 5)
+    :param x_in: Input DataFrame with a DatetimeIndex.
+    :type: pd.DataFrame
+    :param sample_freq: Sampling frequency in minutes, default is 5.
+    :type: int
+    :param threshold_accept: Threshold for accepting valid data, default is 1.0.
+    :type: float
+    :param min_sample_per_day: Minimum samples required per day to consider the data valid, default is 3.
+    :type: int
+    :param min_sample_per_workday: Minimum samples required per workday (Monday to Friday) to consider the data valid, default is 9.
+    :type: int
+    
+    :raises Exception: If the DataFrame does not have a DatetimeIndex.
 
+    :return: A DataFrame containing the normalized data for each weekday.
+    :rtype: pd.DataFrame
     """
 
     # BASIC INPUT CHECK
@@ -272,14 +281,34 @@ def GetWeekDayCurve(x_in, sample_freq=5, threshold_accept=1.0, min_sample_per_da
             Y = pd.read_pickle("./default.wdc")
 
     return Y
-   
-    
+       
 def GetNSSCPredictedSamples(max_vet: pd.DataFrame,
                             min_vet: pd.DataFrame,
                             weekday_curve: pd.DataFrame,
                             sample_freq: int = 5,
                             sample_time_base: str = 'm') -> pd.DataFrame:
+    """
+    Generate predicted samples for NS-SSC using maximum and minimum vectors, 
+    and a curve based on weekdays.
 
+    :param max_vet: The maximum vector DataFrame.
+    :type max_vet: pd.DataFrame
+    :param min_vet: The minimum vector DataFrame.
+    :type min_vet: pd.DataFrame
+    :param weekday_curve: DataFrame representing the curve based on weekdays.
+    :type weekday_curve: pd.DataFrame
+    :param sample_freq: The frequency of sampling. Defaults to 5.
+    :type sample_freq: int
+    :param sample_time_base: The base unit of time for sampling, can be 's', 'm', or 'h'. Defaults to 'm'.
+    :type sample_time_base: str
+
+    :raises Exception: If the sample_time_base is not 's', 'm', or 'h'.
+
+    :return: A DataFrame with predicted values.
+    :rtype: pd.DataFrame
+    """
+    
+    
     # BASIC INPUT CHECK
 
     if sample_time_base not in ['s', 'm', 'h']:
@@ -319,8 +348,6 @@ def GetNSSCPredictedSamples(max_vet: pd.DataFrame,
 
     return Y
 
-
-
 def ReplaceData(x_in:pd.core.frame.DataFrame,
                 x_replace:pd.core.frame.DataFrame,
                 start_date_dt: datetime,
@@ -331,9 +358,36 @@ def ReplaceData(x_in:pd.core.frame.DataFrame,
                 num_samples_patamar:int = 12*6,                
                 sample_freq:int = 5,
                 sample_time_base:str = 'm' ) -> pd.core.frame.DataFrame:
+    """
+    Replaces data in a DataFrame based on specified conditions and thresholds.
 
+    :param x_in: The input DataFrame containing the data to be analyzed and replaced.
+    :type x_in: pd.core.frame.DataFrame
+    :param x_replace: The DataFrame containing replacement data.
+    :type x_replace: pd.core.frame.DataFrame
+    :param start_date_dt: The start date for the data replacement process.
+    :type start_date_dt: datetime
+    :param end_date_dt: The end date for the data replacement process.
+    :type end_date_dt: datetime
+    :param num_samples_day: The number of samples per day, default is 288 (12 * 24).
+    :type num_samples_day: int
+    :param day_threshold: The threshold for day-based null value analysis, default is 0.5.
+    :type day_threshold: float
+    :param patamar_threshold: The threshold for patamar-based null value analysis, default is 0.5.
+    :type patamar_threshold: float
+    :param num_samples_patamar: The number of samples per patamar, default is 72 (12 * 6).
+    :type num_samples_patamar: int
+    :param sample_freq: The frequency of samples, default is 5.
+    :type sample_freq: int
+    :param sample_time_base: The time base unit for sampling, default is 'm' (minutes).
+    :type sample_time_base: str
+    :return: A DataFrame with data replaced based on the specified conditions.
+    :rtype: pd.core.frame.DataFrame
+    
+    Note: `x_in` and `x_replace` must have the same structure and index type.
+    """
 
-
+    #Mark days and patamar with null values greater than threshold
     output_isnull_day = x_in.isnull().groupby([x_in.index.day,x_in.index.month,x_in.index.year]).sum()    
     output_isnull_day.columns = output_isnull_day.columns.values + "_mark"
     output_isnull_day = output_isnull_day/num_samples_day
@@ -347,9 +401,7 @@ def ReplaceData(x_in:pd.core.frame.DataFrame,
     output_isnull_day = output_isnull_day>=day_threshold        
     output_isnull_day = output_isnull_day.loc[~(output_isnull_day.sum(axis=1)==0),:]    
     
-       
-    
-    
+    #Mark Patamar with null values greater than threshold
     output_isnull_patamar = x_in.copy(deep=True)
     output_isnull_patamar['dp'] = output_isnull_patamar.index.hour.map(f_remove.DayPeriodMapper)
     output_isnull_patamar = x_in.isnull().groupby([output_isnull_patamar.index.day,output_isnull_patamar.index.month,output_isnull_patamar.index.year,output_isnull_patamar.dp]).sum()        
@@ -366,12 +418,13 @@ def ReplaceData(x_in:pd.core.frame.DataFrame,
     output_isnull_patamar = output_isnull_patamar.loc[~(output_isnull_patamar.sum(axis=1)==0),:]    
     
     
+    #Create a time array with the same size of x_in
     timearray = np.arange(start_date_dt, end_date_dt,np.timedelta64(sample_freq,sample_time_base), dtype='datetime64')    
     mark_substitute = pd.DataFrame(index=timearray,columns = x_in.columns.values, dtype=object)    
     mark_substitute.index.name = 'timestamp'
     mark_substitute.loc[:,:] = False
     
-    
+    #Create index for day and patamar
     index_day = { 'day': x_in.index.day.values.astype(str), 'month': x_in.index.month.values.astype(str), 'year': x_in.index.year.values.astype(str) }
     index_day = pd.DataFrame(index_day)    
     index_day = index_day['day'].astype(str) + '-' + index_day['month'].astype(str) + '-' + index_day['year'].astype(str)
@@ -381,7 +434,7 @@ def ReplaceData(x_in:pd.core.frame.DataFrame,
     index_patamar['dp'] = x_in.index.hour.map(f_remove.DayPeriodMapper)
     index_patamar = index_patamar['day'].astype(str) + '-' + index_patamar['month'].astype(str) + '-' + index_patamar['year'].astype(str) + '-' + index_patamar['dp'].astype(str)
     
-            
+    
     mark_substitute['index_patamar'] = index_patamar.values
     mark_substitute = pd.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
     for col in output.columns.values:
@@ -399,11 +452,75 @@ def ReplaceData(x_in:pd.core.frame.DataFrame,
         
     mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
 
+    #Replace data
     x_out =  x_in.copy(deep=True)    
     x_out[mark_substitute] = x_replace[mark_substitute]
 
 
     return x_out
+
+def NSSCFunction(x_in: pd.DataFrame,
+                 start_date_dt: datetime,
+                 end_date_dt: datetime,
+                 sample_freq: int = 5,
+                 threshold_accept_min_max: float = 1.0,
+                 threshold_accept_curve: float = 1.0,
+                 min_sample_per_day: int = 3,
+                 num_samples_day:int = 12*24,
+                 day_threshold:float = 0.5,
+                 patamar_threshold:float = 0.5,
+                 num_samples_patamar:int = 12*6,      
+                 sample_time_base:str='m',
+                 min_sample_per_workday: int = 9) -> pd.DataFrame:
+    """
+    Implement the NSSC method.
+
+    :param x_in: Input data frame.
+    :type x_in: pd.DataFrame
+    :param start_date_dt: Start date for the processing.
+    :type start_date_dt: datetime
+    :param end_date_dt: End date for the processing.
+    :type end_date_dt: datetime
+    :param sample_freq: Sampling frequency, default is 5.
+    :type sample_freq: int
+    :param threshold_accept_min_max: Threshold for accepting minimum and maximum values, default is 1.0.
+    :type threshold_accept_min_max: float
+    :param threshold_accept_curve: Threshold for accepting curve values, default is 1.0.
+    :type threshold_accept_curve: float
+    :param min_sample_per_day: Minimum number of samples per day, default is 3.
+    :type min_sample_per_day: int
+    :param num_samples_day: Number of samples per day, default is 288 (12*24).
+    :type num_samples_day: int
+    :param day_threshold: Day threshold value, default is 0.5.
+    :type day_threshold: float
+    :param patamar_threshold: Patamar threshold value, default is 0.5.
+    :type patamar_threshold: float
+    :param num_samples_patamar: Number of samples for patamar, default is 72 (12*6).
+    :type num_samples_patamar: int
+    :param sample_time_base: Base unit for sample time, default is 'm' for minutes.
+    :type sample_time_base: str
+    :param min_sample_per_workday: Minimum number of samples per workday, default is 9.
+    :type min_sample_per_workday: int
+
+    :return: Processed data frame.
+    :rtype: pd.DataFrame
+    """
+    
+    # Get day max/min values
+    max_vet,_ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq,threshold_accept_min_max,exe_param='max')         
+    min_vet,_ = GetDayMaxMin(output,start_date_dt,end_date_dt,sample_freq,threshold_accept_min_max,exe_param='min')  
+
+    # Get weekday curve
+    weekday_curve = GetWeekDayCurve(x_in, sample_freq, threshold_accept_curve, min_sample_per_day, min_sample_per_workday)
+    
+    # Get NSSC predicted samples
+    X_pred = GetNSSCPredictedSamples(max_vet, min_vet, weekday_curve, sample_freq,sample_time_base)
+
+    # Replace data
+    x_out = ReplaceData(output,X_pred,start_date_dt,end_date_dt,sample_freq,sample_time_base,num_samples_day,day_threshold,patamar_threshold,num_samples_patamar)
+    
+    return x_out
+
 
 if __name__ == "__main__":
     
@@ -501,9 +618,6 @@ if __name__ == "__main__":
     ax.set_title('X_pred')
 
 
-    #Criarr as regras para substituir X_pred no vetor x_in
-    #Validar as regras de substituição do x_pred no vetor x_in
-    # Criar uma função que implemente todo o NSSC
 
     output = ReplaceData(output,X_pred,start_date_dt,end_date_dt)
 

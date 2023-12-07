@@ -18,7 +18,7 @@ import FinishedFunctions as f_remove
 if __name__ == "__main__":
 
     start_date_dt = datetime(2021,1,1)
-    end_date_dt = datetime(2023,1,1)
+    end_date_dt = datetime(2021,1,15)
 
     dummy = f_remove.CurrentDummyData()
     dummy.plot(title="Current Input (with outliers [A])")
@@ -31,6 +31,7 @@ if __name__ == "__main__":
     time_stopper.append(['DataSynchronization', time.perf_counter()])
     output.plot(title="DataSynchronization")
     
+    output.iloc[0:12*24*2,2] = numpy.nan
     
     output = f_remove.RemoveOutliersHardThreshold(output, hard_max=500, hard_min=0)
     f_remove.CountMissingData(output, show=True)    
@@ -58,14 +59,99 @@ if __name__ == "__main__":
     output.plot(title="+RemoveOutliersHistoGram")
 
 
+    #DEBUG  NAO DEVERIA COLOCAR VALORES SE NÃO EXISTEM AS 3 FASES 
+    #VER SE É BUG DO NEUTRO
+
+    
+    # -------------------------#
+    #          HOUR           #
+    # -------------------------#
+
+    from itertools import permutations
+
+    # make output vector
+    X = output.copy(deep=True)
+    Y = X.copy(deep=True)
+    threshold_accept = 0.6
+
+    mask_valid = ~X.isnull()
+    grouper_valid = mask_valid.groupby(
+        [mask_valid.index.year, mask_valid.index.month, mask_valid.index.day, mask_valid.index.hour])
+    count_valid = grouper_valid.transform('sum')
+
+    mask_null = X.isnull()
+    grouper_null = mask_null.groupby(
+        [mask_null.index.year, mask_null.index.month, mask_null.index.day, mask_null.index.hour])
+    count_null = grouper_null.transform('sum')
+
+    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+
+    grouper = X.groupby([X.index.year, X.index.month, X.index.day, X.index.hour])
+    X_mean = grouper.transform('mean')
+
+    X_mean[mask_reject] = numpy.nan
+
+    # Make all the possible permutations between columns
+    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+
+    
+
+    # make columns names
+    comb_vet_str = []
+    for comb in comb_vet:
+        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+
+    # Create relation vector
+    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+
+    corr_vet = []
+    for i in range(0, len(comb_vet)):
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+
+        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+
+    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+    corr_vet.set_index('comb', drop=True, inplace=True)
+    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+
+    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+
+    
+
+    for i in range(0, len(comb_vet)):
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+
+    
+
+    for i in range(0, len(comb_vet)):
+        comb = comb_vet[i]
+        comb_str = comb_vet_str[i]
+        Y.loc[
+            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
+
+
+    '''
     # Interpolate before and after with proportion between phases
-    output = output.interpolate(method_type='linear', limit=2)    
+    output = output.interpolate(method_type='linear', limit=12)    
+    output.plot(title="+PhaseProportionInput (Per_interpol)")
     output = f_remove.PhaseProportionInput(output, threshold_accept=0.60)        
-    output = output.interpolate(method_type='linear', limit=2)
+    output.plot(title="+PhaseProportionInput")
+    output = output.interpolate(method_type='linear', limit=12)
+    output.plot(title="+PhaseProportionInput (Per_interpol)")
     f_remove.CountMissingData(output, show=True)
     time_stopper.append(['PhaseProportionInput', time.perf_counter()])
-    output.plot(title="+PhaseProportionInput")
+    '''
 
+
+
+    '''
     output[0:200000] = numpy.nan
     f_remove.CountMissingData(output, show=True)
     time_stopper.append(['Lost a Phase', time.perf_counter()])
@@ -100,3 +186,5 @@ if __name__ == "__main__":
     f_remove.TimeProfile(time_stopper, name='Main', show=True, estimate_for=1000 * 5)
 
     #f_remove.ShowExampleSimpleProcess()
+    
+    '''

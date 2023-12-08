@@ -403,7 +403,7 @@ def YearPeriodMapperVet(month: pandas.core.series.Series) -> pandas.core.series.
     """
 
     map_dict = {10: 0, 11: 0, 12: 0, 1: 0, 2: 0, 3: 0,
-                4: 1, 5: 1, 6: 1, 7: 1, 9: 1}
+                4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1}
 
     season = month.map(map_dict)
 
@@ -412,8 +412,14 @@ def YearPeriodMapperVet(month: pandas.core.series.Series) -> pandas.core.series.
 
 def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
                          threshold_accept: float = 0.75,
+                         plot: bool = False,
+                         apply_filter: bool = True, 
+                         time_frame_apply:list = ['h','pd','D','M','S','Y','A'],
                          remove_from_process: list = []) -> pandas.core.frame.DataFrame:
+   
     """
+    Processes input DataFrame to compute phase proportion based on various time frames and criteria.
+
     Makes the imputation of missing data samples based on the ration between columns. (time series)
 
     Theory background.:
@@ -442,25 +448,32 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
     whole year to calculate the ratio between phases. Regarding the minimum amount of data that a period
     should have to be valid it is assumed the default of 50% for all phases.
 
-
-    :param x_in: A pandas.core.frame.DataFrame where the index is of type "pandas.core.indexes.datetime.DatetimeIndex"
-    and each column contain an electrical quantity time series.
+    :param x_in: Input DataFrame with a DatetimeIndex.
     :type x_in: pandas.core.frame.DataFrame
+    :param threshold_accept: Threshold for accepting data based on null value proportion, defaults to 0.75.
+    :type threshold_accept: float, optional
+    :param plot: Flag to indicate if plots should be generated, defaults to False.
+    :type plot: bool, optional
+    :param apply_filter: Flag to indicate if outlier filter should be applied, defaults to True.
+    :type apply_filter: bool, optional
+    :param time_frame_apply: List of time frames to apply phase proportion analysis, defaults to ['h','pd','D','M','S','Y','A'].
+    :type time_frame_apply: list, optional
+    :param remove_from_process: List of columns to exclude from processing, defaults to an empty list.
+    :type remove_from_process: list, optional
+    :return: DataFrame with phase proportions computed and applied.
+    :rtype: pandas.core.frame.DataFrame
 
-    :param threshold_accept: The minimum amount of samples to accept. Defaults to 0.75 (75%).
-    :type threshold_accept: float,optional
+    :raises Exception: If input DataFrame does not have a DatetimeIndex.
+    :raises Exception: If input DataFrame has less than two columns.
+    :raises Exception: If no time frames are provided in `time_frame_apply`.
 
-    :param remove_from_process: Columns to be kept off the process;
-    :type remove_from_process: list,optional
-
-    :raises Exception: if x_in has less than two columns to process.
-    :raises Exception: if x_in has no DatetimeIndex.
-
-    :return: Y: The pandas.core.frame.DataFrame with samples filled based on the proportion between time series.
-    :rtype: Y: pandas.core.frame.DataFrame
-
+    The function applies various transformations and calculations based on specified time frames, 
+    handling missing data, computing correlations, and applying filters if required. It optionally 
+    generates plots for the analysis. The final DataFrame includes computed phase proportions 
+    and, if specified, the columns that were excluded from processing.
+    
     """
-
+    
     # -------------------#
     # BASIC INPUT CHECK #
     # -------------------#
@@ -480,437 +493,546 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
 
     if len(X.columns) < 2:
         raise Exception("Not enough columns. Need at least two.")
+        
+    if len(time_frame_apply)==0:
+        raise Exception("Not enough time frames to apply. At least one.")
 
     # make output vector
     Y = X.copy(deep=True)
 
     time_stopper.append(['Copy', time.perf_counter()])
-    # -------------------------#
-    #          HOUR           #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby(
-        [mask_valid.index.year, mask_valid.index.month, mask_valid.index.day, mask_valid.index.hour])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby(
-        [mask_null.index.year, mask_null.index.month, mask_null.index.day, mask_null.index.hour])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([X.index.year, X.index.month, X.index.day, X.index.hour])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    time_stopper.append(['Hour-Group', time.perf_counter()])
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    time_stopper.append(['Hour-Corr', time.perf_counter()])
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    time_stopper.append(['Hour-Relation', time.perf_counter()])
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Hour-Y', time.perf_counter()])
-
-    time_stopper.append(['Hour', time.perf_counter()])
-
-    # -------------------------#
-    #    PERIOD OF THE DAY     #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month, mask_valid.index.day,
-                                        DayPeriodMapperVet(mask_valid.index.hour)])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby(
-        [mask_null.index.year, mask_null.index.month, mask_null.index.day, DayPeriodMapperVet(mask_valid.index.hour)])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([X.index.year, X.index.month, X.index.day, DayPeriodMapperVet(mask_valid.index.hour)])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Patamar', time.perf_counter()])
-    # -------------------------#
-    #          DAY            #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month, mask_valid.index.day])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year, mask_null.index.month, mask_null.index.day])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([X.index.year, X.index.month, X.index.day])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Day', time.perf_counter()])
-    # -------------------------#
-    #          MONTH          #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year, mask_null.index.month])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([X.index.year, X.index.month])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    #  Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    #  make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    #  Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Month', time.perf_counter()])
-    # -------------------------#
-    #       HUMID/DRY         #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Season', time.perf_counter()])
-
-    # -------------------------#
-    #          YEAR           #
-    # -------------------------#
-
-    mask_valid = ~X.isnull()
-    grouper_valid = mask_valid.groupby([mask_valid.index.year])
-    count_valid = grouper_valid.transform('sum')
-
-    mask_null = X.isnull()
-    grouper_null = mask_null.groupby([mask_null.index.year])
-    count_null = grouper_null.transform('sum')
-
-    mask_reject = count_valid / (count_null + count_valid) < threshold_accept
-
-    grouper = X.groupby([X.index.year])
-    X_mean = grouper.transform('mean')
-
-    X_mean[mask_reject] = numpy.nan
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['Year', time.perf_counter()])
-
-    # -------------------------#
-    #     ALL TIME SERIES     #
-    # -------------------------#
-
-    X_mean = X.copy(deep=True)
-
-    for col in X_mean.columns.values:
-        X_mean[col] = X_mean[col].mean()
-
-    # Make all the possible permutations between columns
-    comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
-
-    # make columns names
-    comb_vet_str = []
-    for comb in comb_vet:
-        comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
-
-    # Create relation vector
-    df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
-
-    corr_vet = []
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
-
-        corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
-        corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
-
-    corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
-    corr_vet.set_index('comb', drop=True, inplace=True)
-    corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
-
-    df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
-
-    for i in range(0, len(comb_vet)):
-        comb = comb_vet[i]
-        comb_str = comb_vet_str[i]
-        Y.loc[
-            (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-            Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                        (~df_relation.loc[:, comb_str].isnull()), comb_str]
-
-    time_stopper.append(['AllTimeSeries', time.perf_counter()])
-
-    # return the keep out columns
-    if len(remove_from_process) > 0:
-        Y = pandas.concat([Y, x_in.loc[:, remove_from_process]], axis=1)
-
-    time_stopper.append(['Final', time.perf_counter()])
-
-    TimeProfile(time_stopper, name='Phase', show=False)
+    
+    if('h' in time_frame_apply):
+    
+        # -------------------------#
+        #          HOUR            #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby(
+            [mask_valid.index.year, mask_valid.index.month, mask_valid.index.day, mask_valid.index.hour])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby(
+            [mask_null.index.year, mask_null.index.month, mask_null.index.day, mask_null.index.hour])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([X.index.year, X.index.month, X.index.day, X.index.hour])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        time_stopper.append(['Hour-Group', time.perf_counter()])
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+    
+    
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"  
+    
+        if(plot):
+            df_relation.plot(title="Relation Hour" + str_plot)        
+            
+            
+    
+        time_stopper.append(['Hour-Corr', time.perf_counter()])
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        time_stopper.append(['Hour-Relation', time.perf_counter()])
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+    
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+               
+    
+        time_stopper.append(['Hour', time.perf_counter()])
+    if('pd' in time_frame_apply):
+        
+        # -------------------------#
+        #    PERIOD OF THE DAY     #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month, mask_valid.index.day,
+                                            DayPeriodMapperVet(mask_valid.index.hour)])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby(
+            [mask_null.index.year, mask_null.index.month, mask_null.index.day, DayPeriodMapperVet(mask_valid.index.hour)])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([X.index.year, X.index.month, X.index.day, DayPeriodMapperVet(mask_valid.index.hour)])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"   
+        
+        if(plot):
+            df_relation.plot(title="Relation Period of the Day" + str_plot)
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+    
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+    
+        time_stopper.append(['Patamar', time.perf_counter()])
+        
+    if('D' in time_frame_apply):
+        # -------------------------#
+        #          DAY            #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month, mask_valid.index.day])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby([mask_null.index.year, mask_null.index.month, mask_null.index.day])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([X.index.year, X.index.month, X.index.day])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"
+            
+        if(plot):
+            df_relation.plot(title="Relation Day" + str_plot)
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+                                                            
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+    
+        time_stopper.append(['Day', time.perf_counter()])
+    
+    if('M' in time_frame_apply):
+        # -------------------------#
+        #          MONTH          #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby([mask_valid.index.year, mask_valid.index.month])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby([mask_null.index.year, mask_null.index.month])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([X.index.year, X.index.month])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        #  Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        #  make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        #  Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"
+        
+        if(plot):
+            df_relation.plot(title="Relation Month" + str_plot)
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+    
+                                                            
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+                                                            
+        time_stopper.append(['Month', time.perf_counter()])
+        
+    if('S' in time_frame_apply):
+        # -------------------------#
+        #       HUMID/DRY         #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby([YearPeriodMapperVet(mask_valid.index.month)])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby([YearPeriodMapperVet(mask_valid.index.month)])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([YearPeriodMapperVet(mask_valid.index.month)])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"
+        
+        if(plot):
+            df_relation.plot(title="Relation Season" + str_plot)
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+    
+                                                            
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+                                                            
+        time_stopper.append(['Season', time.perf_counter()])
+    if('Y' in time_frame_apply):
+        
+        # -------------------------#
+        #          YEAR           #
+        # -------------------------#
+    
+        mask_valid = ~X.isnull()
+        grouper_valid = mask_valid.groupby([mask_valid.index.year])
+        count_valid = grouper_valid.transform('sum')
+    
+        mask_null = X.isnull()
+        grouper_null = mask_null.groupby([mask_null.index.year])
+        count_null = grouper_null.transform('sum')
+    
+        mask_reject = count_valid / (count_null + count_valid) < threshold_accept
+    
+        grouper = X.groupby([X.index.year])
+        X_mean = grouper.transform('mean')
+    
+        X_mean[mask_reject] = numpy.nan
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"
+            
+        if(plot):
+            df_relation.plot(title="Relation Year" + str_plot)
+    
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+                                                            
+                                                            
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+    
+        time_stopper.append(['Year', time.perf_counter()])
+
+    if('A' in time_frame_apply):
+        # -------------------------#
+        #     ALL TIME SERIES     #
+        # -------------------------#
+    
+        X_mean = X.copy(deep=True)
+    
+        for col in X_mean.columns.values:
+            X_mean[col] = X_mean[col].mean()
+    
+        # Make all the possible permutations between columns
+        comb_vet = list(permutations(range(0, X_mean.shape[1]), r=2))
+    
+        # make columns names
+        comb_vet_str = []
+        for comb in comb_vet:
+            comb_vet_str.append(str(comb[0]) + '-' + str(comb[1]))
+    
+        # Create relation vector
+        df_relation = pandas.DataFrame(index=X_mean.index, columns=comb_vet_str, dtype=object)
+    
+        corr_vet = []
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = X_mean.iloc[:, list(comb)].iloc[:, 0] / X_mean.iloc[:, list(comb)].iloc[:, 1]
+    
+            corr = X_mean.iloc[:, list(comb)].iloc[:, 0].corr(X_mean.iloc[:, list(comb)].iloc[:, 1])
+            corr_vet.append([str(comb[0]) + '-' + str(comb[1]), corr])
+    
+        corr_vet = pandas.DataFrame(corr_vet, columns=['comb', 'corr'])
+        corr_vet.set_index('comb', drop=True, inplace=True)
+        corr_vet.sort_values(by=['corr'], ascending=False, inplace=True)
+    
+        df_relation.replace([numpy.inf, -numpy.inf], numpy.nan, inplace=True)
+        
+        str_plot = ""
+        if(apply_filter):       
+            df_relation = RemoveOutliersQuantile(df_relation) 
+            str_plot = " (filtered)"
+        
+        if(plot):
+            df_relation.plot(title="Relation All Samples" + str_plot)
+            
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            df_relation.loc[:, comb_str] = df_relation.loc[:, comb_str] * X.iloc[:, list(comb)[1]]
+    
+        for i in range(0, len(comb_vet)):
+            comb = comb_vet[i]
+            comb_str = comb_vet_str[i]
+            Y.loc[
+                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
+                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
+                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+    
+        #Make sure that if all phases are lost it does not use the phase proportion                     
+        mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
+        Y[mark_lost_all_columns] = numpy.nan
+                                                            
+        time_stopper.append(['AllTimeSeries', time.perf_counter()])
+    
+        # return the keep out columns
+        if len(remove_from_process) > 0:
+            Y = pandas.concat([Y, x_in.loc[:, remove_from_process]], axis=1)
+    
+        time_stopper.append(['Final', time.perf_counter()])
+    
+        TimeProfile(time_stopper, name='Phase', show=False)
+    
+    if(plot):
+        matplotlib.pyplot.show()
 
     return Y
 
@@ -1123,12 +1245,14 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
 
     # For debug
     if plot:
-        ax = X_moving_median.plot()
-        x_in.plot(ax=ax)
-        X_mad.plot(ax=ax)
-        X_moving_down.plot(ax=ax)
-        X_moving_up.plot(ax=ax)
-        Y.plot()
+        #ax = X_moving_median.plot()
+        ax = x_in.plot(title = 'RemoveOutliersMMADMM')        
+        #X_mad.plot(ax=ax)
+        X_moving_down.plot.line(ax=ax,color='black',style='-')
+        X_moving_up.plot(ax=ax,color='black',style='-')        
+        X[X_mark].plot(ax=ax,color='red',style='.')
+        #Y.plot()
+        matplotlib.pyplot.show()
 
     return Y
 
@@ -1257,7 +1381,7 @@ def RemoveOutliersQuantile(x_in: pandas.core.frame.DataFrame,
     for col_name in Y.columns:
         q1 = X[col_name].quantile(0.25)
         q3 = X[col_name].quantile(0.75)
-        iqr = q3 - q1  # Inter quartile range
+        iqr = q3 - q1  # Inter quartile range        
         fence_low = q1 - 1.5 * iqr
         fence_high = q3 + 1.5 * iqr
         Y.loc[(Y[col_name] < fence_low) | (Y[col_name] > fence_high), col_name] = numpy.nan

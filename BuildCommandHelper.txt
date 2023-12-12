@@ -1,3 +1,5 @@
+https://setuptools.pypa.io/en/latest/userguide/quickstart.html
+
 https://packaging.python.org/en/latest/tutorials/packaging-projects/
 py -m build
 py -m twine upload --repository testpypi dist/*

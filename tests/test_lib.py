@@ -18,6 +18,6 @@ import FinishedFunctions as f_remove
 if __name__ == "__main__":
     
 
-    #f_remove.ShowExampleSimpleProcess(plot=True)
-    f_remove.ShowExampleNSSCProcess(plot=True)
+    f_remove.ShowExampleSimpleProcess(plot=False)
+    #f_remove.ShowExampleNSSCProcess(plot=False)
     

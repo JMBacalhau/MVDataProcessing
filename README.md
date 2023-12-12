@@ -46,8 +46,9 @@ pip install MVDataProcessing
 ```python
 import MVDataProcessing as mvp
     
-#NSSC process example. Check the console for explanation.  
+#Simple process example. Check the console for explanation.  
 #Run with plot=True to visualize plot and then with plot=False to check performance.
+
 mvp.ShowExampleSimpleProcess(plot=True)
 ```
 
@@ -57,9 +58,17 @@ mvp.ShowExampleSimpleProcess(plot=True)
 import MVDataProcessing as mvp
 
 #NSSC process example. Check the console for explanation.  
-#Run with plot=True to visualize plot and then with plot=False to check performance.    
+#Run with plot=True to visualize plot and then with plot=False to check performance.   
+ 
 mvp.ShowExampleNSSCProcess(plot=True)
 ```
+
+### Contributing
+
+Pull requests are welcome. For major changes, please open an issue first
+to discuss what you would like to change.
+
+Please make sure to update tests as appropriate.
 
 ### Licence
 

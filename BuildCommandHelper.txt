@@ -1,5 +1,18 @@
-https://setuptools.pypa.io/en/latest/userguide/quickstart.html
 
-https://packaging.python.org/en/latest/tutorials/packaging-projects/
+Remender to create the .pypirc inside user home folder to use api token.
+
+'''
+
+[distutils]
+index-servers =
+    testpypi
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = xxxxxxx
+
+'''
+
 py -m build
-py -m twine upload --repository testpypi dist/*
+py -m twine upload --r testpypi dist/*

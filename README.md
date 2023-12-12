@@ -27,6 +27,45 @@ packaging_tutorial/
 ├── src/
 │   └── MVDataProcessing/
 │       ├── __init__.py
-│       └── PProcessing.py
+│		├── Clean.py
+│		├── Fill.py
+│		├── Util.py
+│       └── Example.py
 └── tests/
+    └── test_lib.py
 ```
+
+### Example 1
+
+```
+import MVDataProcessing as mvp
+
+if __name__ == "__main__":
+    
+    #Simple process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.
+    mvp.Example.ShowExampleSimpleProcess(plot=True)
+
+```
+
+### Example 2
+
+```
+import MVDataProcessing as mvp
+
+if __name__ == "__main__":
+    
+    #NSSC process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.    
+    mvp.ExampleShowExampleNSSCProcess(plot=True)
+
+```
+
+
+### Licence
+
+Copyright <2023> <JMBacalhau>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

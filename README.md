@@ -30,7 +30,7 @@ packaging_tutorial/
 │		├── Clean.py
 │		├── Fill.py
 │		├── Util.py
-│       └── Example.py
+│       ├── Example.py
 └── tests/
     └── test_lib.py
 ```
@@ -46,19 +46,20 @@ pip install MVDataProcessing
 ```python
 import MVDataProcessing as mvp
     
-#Simple process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.
+#NSSC process example. Check the console for explanation.  
+#Run with plot=True to visualize plot and then with plot=False to check performance.
 mvp.ShowExampleSimpleProcess(plot=True)
 ```
 
 #### Example 2
 
-```
+```python
 import MVDataProcessing as mvp
 
-#NSSC process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.    
+#NSSC process example. Check the console for explanation.  
+#Run with plot=True to visualize plot and then with plot=False to check performance.    
 mvp.ShowExampleNSSCProcess(plot=True)
 ```
-
 
 ### Licence
 

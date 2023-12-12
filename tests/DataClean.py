@@ -20,10 +20,10 @@ if __name__ == "__main__":
     start_date_dt = datetime(2023,1,1)  
     end_date_dt = datetime(2024,1,1)
 
-    dummy = f_remove.CurrentDummyData(qty_weeks=90)
+    dummy = f_remove.CurrentDummyData(qty_weeks=1)
     dummy.drop(columns = ['IN'],inplace=True)
 
-    
+        
     time_stopper = [['time_init', time.perf_counter()]]
     
     
@@ -35,6 +35,17 @@ if __name__ == "__main__":
     output.iloc[12*24*3:12*24*10,2] = numpy.nan
     
     output.plot(title="Missing Phase")
+    
+    
+    
+    f_remove.PowerFactorDummyData(qty_weeks=1).plot()
+    
+    dummy_fp = pandas.read_csv("C:/Git/MVDataProcessing/CALADJ2074_FP.csv")    
+    dummy_fp['timestamp'] = pandas.to_datetime(dummy_fp['timestamp'])
+    dummy_fp.set_index('timestamp',inplace=True)
+    dummy_fp = f_remove.DataSynchronization(dummy_fp, datetime(2022,6,13),datetime(2022,6,21), sample_freq=5, sample_time_base='m')
+    dummy_fp = numpy.round(dummy_fp,2)
+    dummy_fp.to_csv("dummy_fp.csv",index=False,header=False)
     
     
 

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     start_date_dt = datetime(2023,1,1)  
     end_date_dt = datetime(2024,1,1)
 
-    dummy = f_remove.CurrentDummyData(qty_weeks=1)
+    dummy = f_remove.CurrentDummyData(qty_weeks=90)
     dummy.drop(columns = ['IN'],inplace=True)
 
         
@@ -37,18 +37,6 @@ if __name__ == "__main__":
     output.plot(title="Missing Phase")
     
     
-    
-    f_remove.PowerFactorDummyData(qty_weeks=1).plot()
-    
-    dummy_fp = pandas.read_csv("C:/Git/MVDataProcessing/CALADJ2074_FP.csv")    
-    dummy_fp['timestamp'] = pandas.to_datetime(dummy_fp['timestamp'])
-    dummy_fp.set_index('timestamp',inplace=True)
-    dummy_fp = f_remove.DataSynchronization(dummy_fp, datetime(2022,6,13),datetime(2022,6,21), sample_freq=5, sample_time_base='m')
-    dummy_fp = numpy.round(dummy_fp,2)
-    dummy_fp.to_csv("dummy_fp.csv",index=False,header=False)
-    
-    
-
     output = f_remove.RemoveOutliersHardThreshold(output, hard_max=500, hard_min=0)
     f_remove.CountMissingData(output, show=True)    
     time_stopper.append(['RemoveOutliersHardThreshold', time.perf_counter()])

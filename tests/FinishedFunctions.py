@@ -6238,10 +6238,13 @@ def PowerFactorDummyData(qty_weeks:int = 12*4,start_date_dt:datetime = datetime(
     return dummy
 
 
-def PowerDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
-    I = CurrentDummyData(start_date, final_date)
-    V = VoltageDummyData(start_date, final_date)
-    pf = PowerFactorDummyData(start_date, final_date)
+def PowerDummyData(qty_weeks:int = 12*4,start_date_dt:datetime = datetime(2023,1,1)):
+    
+    end_date_dt = start_date_dt  + dt.timedelta(days=qty_weeks*7)
+    
+    I = CurrentDummyData(qty_weeks, start_date_dt)
+    V = VoltageDummyData(qty_weeks, start_date_dt)
+    pf = PowerFactorDummyData(qty_weeks, start_date_dt)
 
     I = I.iloc[:, :-1]
 
@@ -6257,8 +6260,8 @@ def PowerDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01
     return dummy
 
 
-def EnergyDummyData(start_date: str = '2021-01-01', final_date: str = '2023-01-01'):
-    dummy_s = PowerDummyData(start_date, final_date)
+def EnergyDummyData(qty_weeks:int = 12*4,start_date_dt:datetime = datetime(2023,1,1)):
+    dummy_s = PowerDummyData(qty_weeks, start_date_dt)
 
     dummy = pandas.DataFrame([])
 

@@ -34,29 +34,29 @@ packaging_tutorial/
 └── tests/
     └── test_lib.py
 ```
+### Installation
 
-### Example 1
+```bash
+pip install MVDataProcessing
+```
+
+### Example of performance and capability
+
+#### Example 1
+```python
+import MVDataProcessing as mvp
+    
+#Simple process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.
+mvp.ShowExampleSimpleProcess(plot=True)
+```
+
+#### Example 2
 
 ```
 import MVDataProcessing as mvp
 
-if __name__ == "__main__":
-    
-    #Simple process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.
-    mvp.Example.ShowExampleSimpleProcess(plot=True)
-
-```
-
-### Example 2
-
-```
-import MVDataProcessing as mvp
-
-if __name__ == "__main__":
-    
-    #NSSC process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.    
-    mvp.ExampleShowExampleNSSCProcess(plot=True)
-
+#NSSC process example. Check the console for explanation. Run with plot=True to visualize plot and then with plot=False to check performance.    
+mvp.ShowExampleNSSCProcess(plot=True)
 ```
 
 

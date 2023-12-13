@@ -14,5 +14,26 @@ password = xxxxxxx
 
 '''
 
+BUILD:
+
 py -m build
-py -m twine upload --r testpypi dist/*
+py -m twine upload -r testpypi dist/*
+
+
+DOCUMENTATION:
+
+https://docs.readthedocs.io/en/stable/intro/getting-started-with-sphinx.html
+
+https://www.youtube.com/watch?v=BWIrhgCAae0&t=4s
+
+pip install sphinx_rtd_theme
+
+mkdir docs
+
+cd docs
+sphinx-quickstart
+
+.\make.bat html
+
+cd .. 
+sphinx-apidoc -f -o docs/ src/

@@ -244,7 +244,7 @@ _ = mvp.ReplaceData(df,X_pred,datetime(2023,1,1),datetime(2024,1,1))
 
 #NSSCInput
 _ = mvp.NSSCInput(df,datetime(2023,1,1),datetime(2024,1,1))
-_.plot()
+#_.plot()
 
 
 

@@ -94,15 +94,14 @@ _ = mvp.CalcUnbalance(df,remove_from_process=['IA'])
 print(_)
 
 
-
-
-
 #SavePeriod
 df_save = pandas.DataFrame([[datetime(2023,1,1),datetime(2023,1,7)],
                             [datetime(2023,2,1),datetime(2023,2,7)],
                             [datetime(2023,1,1),datetime(2023,5,7)]])
 
-
+_,index_ =  mvp.SavePeriod(mvp.CurrentDummyData(), df_save)
+print(_)
+print(index_)
 
 
 #MarkNanPeriod
@@ -136,11 +135,13 @@ print(index_)
 
 #GetWeekDayCurve
 _ = mvp.GetWeekDayCurve(mvp.CurrentDummyData(),sample_freq=5,threshold_accept=0.9,min_sample_per_day=3,min_sample_per_workday=9)
+print(_)
 
 df = mvp.CurrentDummyData()
 df['IA'] = numpy.nan
 
 _ = mvp.GetWeekDayCurve(df,sample_freq=5,threshold_accept=0.9,min_sample_per_day=3,min_sample_per_workday=9)
+print(_)
 
 #-------------#
 #    CLEAN    #

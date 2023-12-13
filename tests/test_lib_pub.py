@@ -217,9 +217,10 @@ df.iloc[60000:75000,1] = numpy.nan
 df.iloc[75000:90000,:] = numpy.nan
 #df.plot()
 
+df = mvp.DataSynchronization(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,sample_time_base='m')
+
 _ = mvp.PhaseProportionInput(df,threshold_accept=0.6,plot=False,apply_filter=True)
 #_.plot()
-
 
 _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True)
 #_.plot()
@@ -227,23 +228,24 @@ _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,po
 _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True,interpol_integrate=5)
 #_.plot()
 
-'''
 
 #GetNSSCPredictedSamples
-#GetDayMaxMin
+df = mvp.RemoveOutliersQuantile(df)
 vet_max,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='max')
 vet_min,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='min')
 
 weekday_curve = mvp.GetWeekDayCurve(df,sample_freq=5,threshold_accept=0.9,min_sample_per_day=3,min_sample_per_workday=9)
 
-X_pred = mvp.GetNSSCPredictedSamples(vet_max,vet_min,weekday_curve,datetime(2023,1,1),datetime(2024,1,1),)
-
+X_pred = mvp.GetNSSCPredictedSamples(vet_max,vet_min,weekday_curve,datetime(2023,1,1),datetime(2024,1,1))
 
 #ReplaceData
+_ = mvp.ReplaceData(df,X_pred,datetime(2023,1,1),datetime(2024,1,1))
+#df.plot()
 
-df = mvp.ReplaceData(df,X_pred,datetime(2023,1,1),datetime(2024,1,1), sample_freq=5,sample_time_base='m')
+#NSSCInput
+_ = mvp.NSSCInput(df,datetime(2023,1,1),datetime(2024,1,1))
+_.plot()
 
-'''
 
 
 #-------------#
@@ -255,11 +257,3 @@ mvp.ShowExampleSimpleProcess(plot=False)
 
 #ShowExampleNSSCProcess
 mvp.ShowExampleNSSCProcess(plot=False)
-
-'''
-#Fill
-
-ReplaceData
-NSSCInput
-
-'''

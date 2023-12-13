@@ -958,7 +958,7 @@ def NSSCInput(x_in: pandas.core.frame.DataFrame,
     weekday_curve = GetWeekDayCurve(x_in, sample_freq, threshold_accept_curve, min_sample_per_day, min_sample_per_workday)
     
     # Get NSSC predicted samples
-    X_pred = GetNSSCPredictedSamples(max_vet, min_vet, weekday_curve, sample_freq,sample_time_base)
+    X_pred = GetNSSCPredictedSamples(max_vet, min_vet, weekday_curve,start_date_dt,end_date_dt, sample_freq,sample_time_base)
 
     # Replace data
     x_out = ReplaceData(x_in,X_pred,start_date_dt,end_date_dt,num_samples_day,day_threshold,patamar_threshold,num_samples_patamar,sample_freq,sample_time_base)

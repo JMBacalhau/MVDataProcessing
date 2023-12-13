@@ -17,23 +17,6 @@ phases, interpolation, and the normalized scaled standard weekday curve.
 Article published on [Link](https://www.sba.org.br/open_journal_systems/index.php/cba/article/view/968).
 
 
-### Structure
-```
-packaging_tutorial/
-├── LICENSE
-├── pyproject.toml
-├── README.md
-├── setup.cfg
-├── src/
-│   └── MVDataProcessing/
-│       ├── __init__.py
-│		├── Clean.py
-│		├── Fill.py
-│		├── Util.py
-│       ├── Example.py
-└── tests/
-    └── test_lib.py
-```
 ### Installation
 
 ```bash

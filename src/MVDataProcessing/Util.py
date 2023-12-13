@@ -471,20 +471,30 @@ def SavePeriod(x_in: pandas.core.frame.DataFrame,
     :param df_save: The first column with the start and the second column with the end date.
     :type df_save: pandas.core.frame.DataFrame
 
-    :return: Y,mark_index_not: The input pandas.core.frame.DataFrame sliced by the df_save periods. it also returns
+    :return: df_values,index_return: The input pandas.core.frame.DataFrame sliced by the df_save periods. it also returns
     the indexes
-    :rtype: Y,mark_index_not: tuple
+    :rtype: df_values,index_return: tuple
 
     """
 
-    Y = x_in.copy(deep=True)
-    mark_index_not = x_in.index
 
-    for index, row in df_save.iterrows():
-        Y = Y.loc[numpy.logical_and(Y.index >= row[0], Y.index <= row[1]), :]
-        mark_index_not = mark_index_not[numpy.logical_and(mark_index_not >= row[0], mark_index_not <= row[1])]
+    df_values = pandas.DataFrame([])
+    index_return = pandas.DataFrame([])
+    
+    for _, row in df_save.iterrows():
+        
+        if(df_values.size==0):        
+            df_values = x_in.loc[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1]), :]
+        else:
+            df_values = pandas.concat((df_values,x_in.loc[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1]), :]),axis=0)
+             
+        if(index_return.size==0):        
+            index_return = pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1])].values)
+        else:
+            index_return = pandas.concat((index_return,pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1])].values)),axis=0)
 
-    return Y, mark_index_not
+
+    return df_values, index_return
 
 
 def MarkNanPeriod(x_in: pandas.core.frame.DataFrame,

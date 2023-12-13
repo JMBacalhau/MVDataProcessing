@@ -14,7 +14,7 @@ password = xxxxxxx
 
 '''
 
-BUILD:
+BUILD TEST:
 
 py -m build
 py -m twine upload -r testpypi dist/*

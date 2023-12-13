@@ -227,8 +227,9 @@ _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,po
 _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True,interpol_integrate=5)
 #_.plot()
 
-#GetNSSCPredictedSamples
+'''
 
+#GetNSSCPredictedSamples
 #GetDayMaxMin
 vet_max,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='max')
 vet_min,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='min')
@@ -242,21 +243,23 @@ X_pred = mvp.GetNSSCPredictedSamples(vet_max,vet_min,weekday_curve,datetime(2023
 
 df = mvp.ReplaceData(df,X_pred,datetime(2023,1,1),datetime(2024,1,1), sample_freq=5,sample_time_base='m')
 
-
+'''
 
 
 #-------------#
 #   EXAMPLE   #
 #-------------#
-'''
 
+#ShowExampleSimpleProcess
+mvp.ShowExampleSimpleProcess(plot=False)
+
+#ShowExampleNSSCProcess
+mvp.ShowExampleNSSCProcess(plot=False)
+
+'''
 #Fill
 
 ReplaceData
 NSSCInput
-
-#Example
-ShowExampleSimpleProcess
-ShowExampleNSSCProcess
 
 '''

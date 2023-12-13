@@ -5087,7 +5087,7 @@ def PowerDummyData(qty_weeks:int = 12*4,start_date_dt:datetime = datetime(2023,1
     dummy['P'] = V['VA'] / numpy.sqrt(3) * I['IA'] * pf['FPA'] + V['VB'] / numpy.sqrt(3) * I['IB'] * pf['FPB'] \
                                                                + V['VV'] / numpy.sqrt(3) * I['IV'] * pf['FPV']
     dummy['Q'] = dummy['S'].pow(2) - dummy['P'].pow(2)
-    dummy['Q'] = numpy.sqrt(dummy['Q'])
+    dummy['Q'] = numpy.sqrt(dummy['Q'].abs())
 
     return dummy
 

@@ -4,6 +4,9 @@ import numpy
 from itertools import permutations
 import matplotlib.pyplot
 import datetime
+from .Clean import RemoveOutliersQuantile
+from .Util import  DayPeriodMapperVet,YearPeriodMapperVet,TimeProfile,DataSynchronization,IntegrateHour,DayPeriodMapper,GetWeekDayCurve,GetDayMaxMin
+
 
 def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
                          threshold_accept: float = 0.75,

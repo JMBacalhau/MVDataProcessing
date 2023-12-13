@@ -143,9 +143,64 @@ df['IA'] = numpy.nan
 _ = mvp.GetWeekDayCurve(df,sample_freq=5,threshold_accept=0.9,min_sample_per_day=3,min_sample_per_workday=9)
 print(_)
 
+
+
 #-------------#
 #    CLEAN    #
 #-------------#
+
+
+
+df_avoid = pandas.DataFrame([[datetime(2023,1,1),datetime(2023,6,1)]])
+
+#RemoveOutliersMMADMM
+#_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=True)
+_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=False)
+
+#_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=True,plot=True)
+_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=True,plot=False)
+
+#_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=True,remove_from_process=['IA']))
+_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=False,remove_from_process=['IA'])
+
+
+#_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=True,remove_from_process=['IA'],df_avoid_periods=df_avoid)
+_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,
+                              min_var_def=3,allow_negatives=False,plot=False,remove_from_process=['IA'],df_avoid_periods=df_avoid)
+#_.plot()
+
+#_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,min_var_def=3,allow_negatives=False,plot=True,df_avoid_periods=df_avoid)
+_  = mvp.RemoveOutliersMMADMM(mvp.CurrentDummyData(),len_mov_avg=20,std_def=5,
+                              min_var_def=3,allow_negatives=False,plot=False,df_avoid_periods=df_avoid)
+#_.plot()
+
+
+#RemoveOutliersHardThreshold
+_  = mvp.RemoveOutliersHardThreshold(mvp.CurrentDummyData(),df_avoid_periods=df_avoid,hard_max=250,hard_min=0)
+#_.plot()
+
+_  = mvp.RemoveOutliersHardThreshold(mvp.CurrentDummyData(),hard_max=250,hard_min=0)
+#_.plot()
+
+
+#RemoveOutliersQuantile
+_ = mvp.RemoveOutliersQuantile(mvp.CurrentDummyData())
+#_.plot()
+
+_ = mvp.RemoveOutliersQuantile(mvp.CurrentDummyData(),remove_from_process=['IA'])
+#_.plot()
+
+_ = mvp.RemoveOutliersQuantile(mvp.CurrentDummyData(),remove_from_process=['IA'],df_avoid_periods=df_avoid)
+#_.plot()
+
+
+#RemoveOutliersHistogram
+_ = mvp.RemoveOutliersHistogram(mvp.CurrentDummyData(),df_avoid_periods=df_avoid,remove_from_process=['IA'],min_number_of_samples_limit=20)
+#_.plot()
+
+_ = mvp.RemoveOutliersHistogram(mvp.CurrentDummyData(),df_avoid_periods=df_avoid,min_number_of_samples_limit=20)
+#_.plot()
+
 
 
 #-------------#
@@ -153,25 +208,50 @@ print(_)
 #-------------#
 
 
+
+#PhaseProportionInput
+df = mvp.CurrentDummyData()
+df.iloc[0:50000,1] = numpy.nan
+df.iloc[60000:75000,2] = numpy.nan
+df.iloc[60000:75000,1] = numpy.nan
+df.iloc[75000:90000,:] = numpy.nan
+#df.plot()
+
+_ = mvp.PhaseProportionInput(df,threshold_accept=0.6,plot=False,apply_filter=True)
+#_.plot()
+
+
+_ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True)
+#_.plot()
+
+_ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True,interpol_integrate=5)
+#_.plot()
+
+#GetNSSCPredictedSamples
+
+#GetDayMaxMin
+vet_max,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='max')
+vet_min,_ = mvp.GetDayMaxMin(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,threshold_accept=0.9,exe_param='min')
+
+weekday_curve = mvp.GetWeekDayCurve(df,sample_freq=5,threshold_accept=0.9,min_sample_per_day=3,min_sample_per_workday=9)
+
+X_pred = mvp.GetNSSCPredictedSamples(vet_max,vet_min,weekday_curve,datetime(2023,1,1),datetime(2024,1,1),)
+
+
+#ReplaceData
+
+df = mvp.ReplaceData(df,X_pred,datetime(2023,1,1),datetime(2024,1,1), sample_freq=5,sample_time_base='m')
+
+
+
+
 #-------------#
 #   EXAMPLE   #
 #-------------#
 '''
-#Util
-
-SavePeriod
-
-
-#Clean
-RemoveOutliersMMADMM
-RemoveOutliersHardThreshold
-RemoveOutliersQuantile
-RemoveOutliersHistogram
 
 #Fill
-PhaseProportionInput
-SimpleProcess
-GetNSSCPredictedSamples
+
 ReplaceData
 NSSCInput
 

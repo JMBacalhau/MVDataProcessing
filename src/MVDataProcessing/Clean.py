@@ -1,6 +1,8 @@
 import pandas
 import numpy
 import matplotlib.pyplot
+from .Util import SavePeriod,IntegrateHour
+
 
 def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
                          df_avoid_periods: pandas.core.frame.DataFrame = pandas.DataFrame([]),

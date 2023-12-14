@@ -219,7 +219,7 @@ df.iloc[75000:90000,:] = numpy.nan
 
 df = mvp.DataSynchronization(df,datetime(2023,1,1),datetime(2024,1,1),sample_freq=5,sample_time_base='m')
 
-_ = mvp.PhaseProportionInput(df,threshold_accept=0.6,plot=False,apply_filter=True)
+_ = mvp.PhaseProportionInput(df,threshold_accept=0.6,plot=False,apply_filter=True,time_frame_apply=['Y'])#['h','pd','D','M','S','Y','A']
 #_.plot()
 
 _ = mvp.SimpleProcess(df,datetime(2023,1,1),datetime(2024,1,1),pre_interpol=1,pos_interpol=1,prop_phases=True)

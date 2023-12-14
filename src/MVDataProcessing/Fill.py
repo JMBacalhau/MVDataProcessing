@@ -100,6 +100,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
 
     time_stopper.append(['Copy', time.perf_counter()])
     
+    #DIVIDE BY ZERO THAT IS NORMAL iS SET TO BE IGNORED
+    _ = numpy.seterr(divide='ignore', invalid='ignore')
+    
     if('h' in time_frame_apply):
     
         # -------------------------#
@@ -631,6 +634,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
     
     if(plot):
         matplotlib.pyplot.show()
+
+    #DIVIDE BY ZERO THAT IS NORMAL iS SET TO BE IGNORED
+    _ = numpy.seterr(divide='warn', invalid='warn')
 
     return Y
 

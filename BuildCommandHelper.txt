@@ -36,6 +36,22 @@ python<version> -m venv <virtual-environment-name>
 pip list
 ~ deactivate
 
+TOX
+
+salvar como tox.ini
+'''
+[tox]
+envlist = py39
+
+[testenv]
+deps = 
+    pytest
+    # Any other dependencies your module might need for testing
+commands =
+    pytest
+	
+'''
+
 
 DOCUMENTATION:
 

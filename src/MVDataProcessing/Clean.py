@@ -85,15 +85,22 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
     # ------------ Computa Mediana Móvel ------------#
     X_moving_median = X_moving_median.rolling(len_mov_avg).median().shift(-int(len_mov_avg / 2))
 
-    X_moving_median.iloc[-2 * len_mov_avg:, :] = X_moving_median.iloc[-2 * len_mov_avg:, :].fillna(method='ffill')
-    X_moving_median.iloc[:2 * len_mov_avg, :] = X_moving_median.iloc[:2 * len_mov_avg, :].fillna(method='bfill')
-
+    #X_moving_median.iloc[-2 * len_mov_avg:, :] = X_moving_median.iloc[-2 * len_mov_avg:, :].fillna(method='ffill')
+    #X_moving_median.iloc[:2 * len_mov_avg, :] = X_moving_median.iloc[:2 * len_mov_avg, :].fillna(method='bfill')
+    
+    X_moving_median.iloc[-2 * len_mov_avg:, :] = X_moving_median.iloc[-2 * len_mov_avg:, :].ffill()
+    X_moving_median.iloc[:2 * len_mov_avg, :] = X_moving_median.iloc[:2 * len_mov_avg, :].bfill() 
+    
     # ------------ Computa MAD Móvel ------------#
     X_mad = X - X_moving_median
     X_mad = X_mad.rolling(len_mov_avg).median().shift(-int(len_mov_avg / 2))
-    X_mad.iloc[-2 * len_mov_avg:, :] = X_mad.iloc[-2 * len_mov_avg:, :].fillna(method='ffill')
-    X_mad.iloc[:2 * len_mov_avg, :] = X_mad.iloc[:2 * len_mov_avg, :].fillna(method='bfill')
+    #X_mad.iloc[-2 * len_mov_avg:, :] = X_mad.iloc[-2 * len_mov_avg:, :].fillna(method='ffill')
+    #X_mad.iloc[:2 * len_mov_avg, :] = X_mad.iloc[:2 * len_mov_avg, :].fillna(method='bfill')
 
+    X_mad.iloc[-2 * len_mov_avg:, :] = X_mad.iloc[-2 * len_mov_avg:, :].ffill()
+    X_mad.iloc[:2 * len_mov_avg, :] = X_mad.iloc[:2 * len_mov_avg, :].bfill() 
+    
+    
     # ------------ Coloca no mínimo de faixa de segurança para dados com baixa variância ------------#
     X_mad[X_mad <= min_var_def] = min_var_def
 

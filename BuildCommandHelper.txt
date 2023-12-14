@@ -1,3 +1,10 @@
+PIP
+
+python -m pip install --upgrade pip
+pip freeze --> uninstall-dependencies.txt
+pip uninstall -y -r uninstall-dependencies.txt
+
+
 
 Remender to create the .pypirc inside user home folder to use api token.
 

@@ -1,12 +1,27 @@
-PIP
+#------------------------------------------------------------#
+# USEFULL COMMANDS FOR MAKING A MODULE AN PUBLISHING IN PYPI #
+#------------------------------------------------------------#
 
+
+#--------#
+#  PIP	 #
+#--------#
+
+#upgrade pip
 python -m pip install --upgrade pip
+
+#Clear all installed modules in enviroment
 pip freeze --> uninstall-dependencies.txt
 pip uninstall -y -r uninstall-dependencies.txt
 
 
+#------------------------#
+# PYPI BUILD AND UPLOAD	 #
+#------------------------#
 
-Remender to create the .pypirc inside user home folder to use api token.
+If the user on pypi has two factor autentication. Remender to create the .pypirc inside user home folder of the user in windows to use api token.
+
+#strutcture of the .pypirc for testpypi
 
 '''
 
@@ -21,59 +36,73 @@ password = xxxxxxx
 
 '''
 
-BUILD TEST:
+#strutcture of the .pypirc for pypi
 
+
+pip install build
+pip install twine
+
+#BUILD
 py -m build
+
+#UPLOAD TO TEST PY
 py -m twine upload -r testpypi dist/*
+
+#UPLOAD TO PYPI
 twine upload dist/*
 
-VIRTUAL ENVIROMENT
+#------------------------#
+#   VIRTUAL ENVIROMENT	 #
+#------------------------#
 
 pip install virtualenv
 
-python<version> -m venv <virtual-environment-name>
+mkdir my_enviroment_folder
+cd my_enviroment_folder
+python -m venv <virtual-environment-name>
 
- mkdir projectA
- cd projectA
- python3.8 -m venv env
-
- env/Scripts/activate.bat //In CMD
- env/Scripts/Activate.ps1 //In Powershel
+my_enviroment_folder/Scripts/activate.bat //In CMD
+my_enviroment_folder/Scripts/Activate.ps1 //In Powershel
 
 pip list
+
 ~ deactivate
 
-TOX
 
-salvar como tox.ini
-'''
-[tox]
-envlist = py39
+#--------------------#
+#   Sphinx autodoc	 #
+#--------------------#
 
-[testenv]
-deps = 
-    pytest
-    # Any other dependencies your module might need for testing
-commands =
-    pytest
-	
-'''
-
-
-DOCUMENTATION:
-
-https://docs.readthedocs.io/en/stable/intro/getting-started-with-sphinx.html
-
-https://www.youtube.com/watch?v=BWIrhgCAae0&t=4s
-
+pip install sphinx
 pip install sphinx_rtd_theme
 
-mkdir docs
+step-by-step:
 
+-> Inside project folder
+mkdir docs
 cd docs
 sphinx-quickstart
+-> That will make the base structure of the docs folder
+-> Add to the beginning of the config.py inside docs the following code.
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 
-.\make.bat html
+-> More stuff to config.py
+extensions = [
+    'sphinx.ext.autodoc',  # Include documentation from docstrings
+    'sphinx.ext.doctest',  # Test snippets in the documentation
+    'sphinx.ext.intersphinx',  # Link to other project's documentation
+    'sphinx.ext.todo',  # Support for todo items
+    'sphinx.ext.viewcode',  # Add links to source code
+]
+html_theme = 'sphinx_rtd_theme'
 
+-> Back to root folder and run.
 cd .. 
 sphinx-apidoc -f -o docs/ src/
+-> each folder in the src dir with a __init__.py will be a module
+-> Go back to docs folder and run
+cd docs
+.\make.bat html
+

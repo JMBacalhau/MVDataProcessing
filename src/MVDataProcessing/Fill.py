@@ -751,7 +751,7 @@ def GetNSSCPredictedSamples(max_vet: pandas.core.frame.DataFrame,
     :param sample_time_base: The base unit of time for sampling, can be 's', 'm', or 'h'. Defaults to 'm'.
     :type sample_time_base: str
 
-    :raises Exception: If the sample_time_base is not 's', 'm', or 'h'.
+    :raises Exception: If the sample_time_base is not 'm'.
 
     :return: A DataFrame with predicted values.
     :rtype: pandas.core.frame.DataFrame
@@ -761,24 +761,24 @@ def GetNSSCPredictedSamples(max_vet: pandas.core.frame.DataFrame,
     # BASIC INPUT CHECK
 
     if sample_time_base not in ['s', 'm', 'h']:
-        raise Exception("The sample_time_base is not in seconds, minutes or hours.")
+        raise Exception("The sample_time_base is not in minutes")
 
-    max_vet = max_vet.iloc[numpy.repeat(numpy.arange(len(max_vet)), 12*24)]
-    min_vet = min_vet.iloc[numpy.repeat(numpy.arange(len(min_vet)), 12*24)]
+    max_vet = max_vet.iloc[numpy.repeat(numpy.arange(len(max_vet)), int(60/sample_freq)*24)]
+    min_vet = min_vet.iloc[numpy.repeat(numpy.arange(len(min_vet)), int(60/sample_freq)*24)]
 
     time_array = numpy.arange(start_date_dt, end_date_dt, numpy.timedelta64(sample_freq, sample_time_base),dtype='datetime64')
 
     vet_samples = pandas.core.frame.DataFrame(index=time_array, dtype=object)
     vet_samples.index.name = 'timestamp'
 
-    num_days = int(vet_samples.shape[0] / (12 * 24))
+    num_days = int(vet_samples.shape[0] / (int(60/sample_freq) * 24))
     first_day = vet_samples.index[0].weekday()
 
-    weekday_curve_vet_begin = weekday_curve.iloc[(first_day * 12 * 24):, :].reset_index(drop=True)
+    weekday_curve_vet_begin = weekday_curve.iloc[(first_day * int(60/sample_freq) * 24):, :].reset_index(drop=True)
     num_mid_weeks = int(numpy.floor((num_days - (7 - first_day)) / 7))
     weekday_curve_vet_mid = pandas.concat([weekday_curve] * num_mid_weeks)
     num_end_days = num_days - num_mid_weeks * 7 - (7 - first_day)
-    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days * (12 * 24), :].reset_index(drop=True)
+    weekday_curve_vet_end = weekday_curve.iloc[:num_end_days * (int(60/sample_freq) * 24), :].reset_index(drop=True)
 
     weekday_curve_vet = pandas.concat([weekday_curve_vet_begin, weekday_curve_vet_mid, weekday_curve_vet_end])
 

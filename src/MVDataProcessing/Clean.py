@@ -299,13 +299,16 @@ def RemoveOutliersHistogram(x_in: pandas.core.frame.DataFrame,
         Y_int = X.copy(deep=True)
 
     for col in Y_int:
-        Y_int[col] = Y_int[col].sort_values(ascending=False, ignore_index=True)
+        Y_int.loc[:,col] = Y_int.loc[:,col].sort_values(ascending=False, ignore_index=True)
 
     if Y_int.shape[0] < min_number_of_samples_limit:
         min_number_of_samples_limit = Y_int.shape[0]
 
     threshold_max = Y_int.iloc[min_number_of_samples_limit + 1, :]
     threshold_min = Y_int.iloc[-min_number_of_samples_limit - 1, :]
+    
+    threshold_max = threshold_max.fillna(9999999999)
+    threshold_min = threshold_min.fillna(0)
 
     for col in Y:
         Y.loc[numpy.logical_or(Y[col] > threshold_max[col], Y[col] < threshold_min[col]), col] = numpy.nan

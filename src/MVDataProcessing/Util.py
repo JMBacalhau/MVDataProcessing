@@ -484,14 +484,14 @@ def SavePeriod(x_in: pandas.core.frame.DataFrame,
     for _, row in df_save.iterrows():
         
         if(df_values.size==0):        
-            df_values = x_in.loc[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1]), :]
+            df_values = x_in.loc[numpy.logical_and(x_in.index >= row.iloc[0], x_in.index <= row.iloc[1]), :]
         else:
-            df_values = pandas.concat((df_values,x_in.loc[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1]), :]),axis=0)
+            df_values = pandas.concat((df_values,x_in.loc[numpy.logical_and(x_in.index >= row.iloc[0], x_in.index <= row.iloc[1]), :]),axis=0)
              
         if(index_return.size==0):        
-            index_return = pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1])].values)
+            index_return = pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row.iloc[0], x_in.index <= row.iloc[1])].values)
         else:
-            index_return = pandas.concat((index_return,pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row[0], x_in.index <= row[1])].values)),axis=0)
+            index_return = pandas.concat((index_return,pandas.Series(x_in.index[numpy.logical_and(x_in.index >= row.iloc[0], x_in.index <= row.iloc[1])].values)),axis=0)
 
 
     return df_values, index_return
@@ -526,7 +526,7 @@ def MarkNanPeriod(x_in: pandas.core.frame.DataFrame,
         Y = Y.drop(remove_from_process, axis=1)
 
     for index, row in df_remove.iterrows():
-        Y.loc[numpy.logical_and(Y.index >= row[0], Y.index <= row[1]), Y.columns.difference(
+        Y.loc[numpy.logical_and(Y.index >= row.iloc[0], Y.index <= row.iloc[1]), Y.columns.difference(
             remove_from_process)] = numpy.nan
 
     # return the keep out columns

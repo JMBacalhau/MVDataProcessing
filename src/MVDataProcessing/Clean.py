@@ -248,8 +248,7 @@ def RemoveOutliersQuantile(x_in: pandas.core.frame.DataFrame,
 
 def RemoveOutliersHistogram(x_in: pandas.core.frame.DataFrame,
                             df_avoid_periods: pandas.DataFrame = pandas.DataFrame([]),
-                            remove_from_process: list = [],
-                            integrate_hour: bool = True,
+                            remove_from_process: list = [],                            
                             sample_freq: int = 5,
                             min_number_of_samples_limit: int = 12) -> pandas.core.frame.DataFrame:
     """
@@ -291,26 +290,24 @@ def RemoveOutliersHistogram(x_in: pandas.core.frame.DataFrame,
 
     Y = X.copy(deep=True)
 
-    # Remove outliers outside the avoid period
-    if integrate_hour:
-        Y_int = IntegrateHour(Y, sample_freq)
-        Y_int = Y_int.reset_index(drop=True)
-    else:
-        Y_int = X.copy(deep=True)
+    for col in X.columns:
+        X.loc[:,col] = X.loc[:,col].sort_values(ascending=False, ignore_index=True).values
+        
+    #print(X.copy(deep=True))
 
-    for col in Y_int.columns:
-        Y_int.loc[:,col] = Y_int.loc[:,col].sort_values(ascending=False, ignore_index=True).values
+    if X.shape[0] < min_number_of_samples_limit:
+        min_number_of_samples_limit = X.shape[0]
 
-    if Y_int.shape[0] < min_number_of_samples_limit:
-        min_number_of_samples_limit = Y_int.shape[0]
-
-    threshold_max = Y_int.iloc[min_number_of_samples_limit + 1, :]
-    threshold_min = Y_int.iloc[-min_number_of_samples_limit - 1, :]
+    threshold_max = X.iloc[min_number_of_samples_limit, :]
+    threshold_min = X.iloc[-min_number_of_samples_limit - 1, :]
     
     threshold_max = threshold_max.fillna(9999999999)
     threshold_min = threshold_min.fillna(0)
 
-    for col in Y:
+    #print(f"threshold_max: {threshold_max}")
+    #print(f"threshold_min: {threshold_min}")
+
+    for col in Y.columns:
         Y.loc[numpy.logical_or(Y[col] > threshold_max[col], Y[col] < threshold_min[col]), col] = numpy.nan
 
     if df_avoid_periods.shape[0] != 0:

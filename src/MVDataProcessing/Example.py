@@ -137,7 +137,7 @@ def ShowExampleSimpleProcess(plot: bool = True):
     if(plot):
         matplotlib.pyplot.show()
     
-    TimeProfile(time_stopper, name='Simple Process', show=~plot, estimate_for=1000 * 5)
+    TimeProfile(time_stopper, name='Simple Process', show=not plot, estimate_for=1000 * 5)
 
     return
 
@@ -338,6 +338,6 @@ def ShowExampleNSSCProcess(plot: bool = True):
     if(plot):
         matplotlib.pyplot.show()
     else:
-        TimeProfile(time_stopper, name='NSSC', show=~plot, estimate_for=1000 * 5)
+        TimeProfile(time_stopper, name='NSSC', show=not plot, estimate_for=1000 * 5)
     
     return

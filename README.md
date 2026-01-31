@@ -2,7 +2,6 @@
 
 [![PyPI version](https://badge.fury.io/py/MVDataProcessing.svg)](https://badge.fury.io/py/MVDataProcessing)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/JMBacalhau/MVDataProcessing/actions/workflows/test.yml/badge.svg)](https://github.com/JMBacalhau/MVDataProcessing/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://mvdataprocessing.readthedocs.io/en/latest/)
 

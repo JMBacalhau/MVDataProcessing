@@ -74,7 +74,7 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
 
     # ------------------------ OUTLIERS ------------------------
 
-    X_mark_outlier = X.copy(deep=True)
+    X_mark_outlier = X.copy(deep=True).astype(bool)
     X_mark_outlier.loc[:, :] = False
 
     # ---------PROCESSAMENTO OUTLIERS POR MÉDIA MÓVEL
@@ -109,7 +109,7 @@ def RemoveOutliersMMADMM(x_in: pandas.core.frame.DataFrame,
     X_moving_down = X_moving_median - std_def * X_mad
 
     # Allow the lower limit to go negative. Only valid for kVar or bidirectional current/Power.
-    if ~allow_negatives:
+    if not allow_negatives:
         X_moving_down[X_moving_down <= 0] = 0
 
     # ------------ Marcando outliers ------------#

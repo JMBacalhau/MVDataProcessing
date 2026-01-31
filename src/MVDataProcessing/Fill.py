@@ -177,10 +177,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
     
         #Make sure that if all phases are lost it does not use the phase proportion                     
         mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
@@ -253,10 +252,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
     
         #Make sure that if all phases are lost it does not use the phase proportion                     
         mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
@@ -326,10 +324,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
                                                             
         #Make sure that if all phases are lost it does not use the phase proportion                     
         mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
@@ -399,10 +396,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
     
                                                             
         #Make sure that if all phases are lost it does not use the phase proportion                     
@@ -473,10 +469,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
     
                                                             
         #Make sure that if all phases are lost it does not use the phase proportion                     
@@ -548,10 +543,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
                                                             
                                                             
         #Make sure that if all phases are lost it does not use the phase proportion                     
@@ -613,10 +607,9 @@ def PhaseProportionInput(x_in: pandas.core.frame.DataFrame,
         for i in range(0, len(comb_vet)):
             comb = comb_vet[i]
             comb_str = comb_vet_str[i]
-            Y.loc[
-                (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull()),
-                Y.columns[list(comb)[0]]] = df_relation.loc[(Y.iloc[:, list(comb)[0]].isnull()) &
-                                                            (~df_relation.loc[:, comb_str].isnull()), comb_str]
+            mask = (Y.iloc[:, list(comb)[0]].isnull()) & (~df_relation.loc[:, comb_str].isnull())
+            if mask.any():
+                Y[Y.columns[list(comb)[0]]] = Y[Y.columns[list(comb)[0]]].where(~mask, df_relation[comb_str])
     
         #Make sure that if all phases are lost it does not use the phase proportion                     
         mark_lost_all_columns = X.isnull().sum(axis=1) >= len(X.columns)    
@@ -716,6 +709,9 @@ def SimpleProcess(x_in: pandas.core.frame.DataFrame,
 
     # Interpolate after proportion between phases
     if pos_interpol:
+        # Ensure numeric dtypes before interpolation (pandas 3.0 requirement)
+        for col in Y.columns:
+            Y[col] = pandas.to_numeric(Y[col], errors='coerce')
         Y = Y.interpolate(method_type='linear', limit=pos_interpol)
 
     # Integralization 1h
@@ -888,22 +884,24 @@ def ReplaceData(x_in:pandas.core.frame.DataFrame,
     mark_substitute = pandas.merge(mark_substitute, output_isnull_patamar,left_on='index_patamar',right_index=True,how='left').fillna(False)
     for col in x_in.columns.values:
         mark_substitute[col] = mark_substitute[col+'_mark']
-        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        mark_substitute.drop(columns=[col+'_mark'],inplace=True)
         
-    mark_substitute.drop(columns=['index_patamar'],axis=1,inplace=True)
+    mark_substitute.drop(columns=['index_patamar'],inplace=True)
     
     mark_substitute['index_day'] = index_day.values
     mark_substitute = pandas.merge(mark_substitute, output_isnull_day,left_on='index_day',right_index=True,how='left').fillna(False)    
     
     for col in x_in.columns.values:
         mark_substitute[col] = mark_substitute[col+'_mark']
-        mark_substitute.drop(columns=[col+'_mark'],axis=1,inplace=True)
+        mark_substitute.drop(columns=[col+'_mark'],inplace=True)
         
-    mark_substitute.drop(columns=['index_day'],axis=1,inplace=True)
+    mark_substitute.drop(columns=['index_day'],inplace=True)
 
     #Replace data
-    x_out =  x_in.copy(deep=True)    
-    x_out[mark_substitute] = x_replace[mark_substitute]
+    x_out =  x_in.copy(deep=True)
+    # Ensure mark_substitute is boolean for pandas 3.0
+    mark_substitute_bool = mark_substitute.astype(bool)
+    x_out[mark_substitute_bool] = x_replace[mark_substitute_bool]
 
 
     return x_out

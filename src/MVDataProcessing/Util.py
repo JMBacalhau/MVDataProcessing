@@ -142,7 +142,7 @@ def DataSynchronization(x_in: pandas.core.frame.DataFrame,
         raise Exception("sample_time_base not valid. Ex. ['s','m','h','D','M','Y'] ")
 
     added_dic = {'s': 'ms', 'm': 's', 'h': 'm', 'D': 'h', 'M': 'D', 'Y': 'M'}
-    floor_dic = {'s': 'S', 'm': 'T', 'h': 'H', 'D': 'D', 'M': 'M', 'Y': 'Y'}
+    floor_dic = {'s': 's', 'm': 'min', 'h': 'h', 'D': 'D', 'M': 'ME', 'Y': 'YE'}
 
     x_in.index = x_in.index.tz_localize(None)  # Makes the datetimeIndex naive (no time zone)
 
@@ -664,7 +664,7 @@ def GetDayMaxMin(x_in: pandas.core.frame.DataFrame, start_date_dt: datetime, end
     time_vet_stamp = pandas.to_datetime(
         vet_idx['Year'].astype(str) + '-' + vet_idx['Month'].astype(str) + '-' + vet_idx['Day'].astype(str))
 
-    vet_idx.drop(columns=['Year', 'Month', 'Day'], axis=1, inplace=True)
+    vet_idx.drop(columns=['Year', 'Month', 'Day'], inplace=True)
     vet_idx = vet_idx.reset_index(drop=True)
     vet_idx.insert(0, 'timestamp_day', time_vet_stamp)
     vet_idx.set_index('timestamp_day', inplace=True)
@@ -675,7 +675,7 @@ def GetDayMaxMin(x_in: pandas.core.frame.DataFrame, start_date_dt: datetime, end
 
     time_vet_stamp = pandas.to_datetime(Y['Year'].astype(str) + '-' + Y['Month'].astype(str) + '-' + Y['Day'].astype(str))
 
-    Y.drop(columns=['Year', 'Month', 'Day'], axis=1, inplace=True)
+    Y.drop(columns=['Year', 'Month', 'Day'], inplace=True)
     Y = Y.reset_index(drop=True)
     Y.insert(0, 'timestamp_day', time_vet_stamp)
     Y.set_index('timestamp_day', inplace=True)
@@ -683,7 +683,7 @@ def GetDayMaxMin(x_in: pandas.core.frame.DataFrame, start_date_dt: datetime, end
     Y = DataSynchronization(Y, start_date_dt, end_date_dt, sample_freq=1, sample_time_base='D')
 
     vet_idx = pandas.merge(vet_idx, Y, left_index=True, right_index=True, how='right', suffixes=('', '_remove'))
-    vet_idx.drop(columns=vet_idx.columns[vet_idx.columns.str.contains('_remove')], axis=1, inplace=True)
+    vet_idx.drop(columns=vet_idx.columns[vet_idx.columns.str.contains('_remove')], inplace=True)
 
     # Missing days get midnight as the  hour of max and min
     for col in vet_idx.columns.values:
